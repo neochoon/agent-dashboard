@@ -1,10 +1,10 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { PANEL_WIDTH } from "./constants.js";
+import { DEFAULT_PANEL_WIDTH } from "./constants.js";
 
 export function WelcomePanel(): React.ReactElement {
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
+    <Box flexDirection="column" borderStyle="single" paddingX={1} width={DEFAULT_PANEL_WIDTH}>
       {/* Header */}
       <Box marginTop={-1}>
         <Text> Welcome to agenthud </Text>

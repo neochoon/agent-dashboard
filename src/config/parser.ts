@@ -62,7 +62,12 @@ export interface Config {
   panels: PanelsConfig;
   customPanels?: Record<string, CustomPanelConfig>;
   panelOrder: string[];
+  width: number;
 }
+
+const DEFAULT_WIDTH = 70;
+const MIN_WIDTH = 50;
+const MAX_WIDTH = 120;
 
 export interface ParseResult {
   config: Config;
@@ -111,6 +116,7 @@ export function getDefaultConfig(): Config {
       },
     },
     panelOrder: ["git", "plan", "tests"],
+    width: DEFAULT_WIDTH,
   };
 }
 
@@ -140,13 +146,27 @@ export function parseConfig(): ParseResult {
   }
 
   const parsed = rawConfig as Record<string, unknown>;
+  const config = getDefaultConfig();
+
+  // Parse width
+  if (typeof parsed.width === "number") {
+    if (parsed.width < MIN_WIDTH) {
+      warnings.push(`Width ${parsed.width} is too small, using minimum of ${MIN_WIDTH}`);
+      config.width = MIN_WIDTH;
+    } else if (parsed.width > MAX_WIDTH) {
+      warnings.push(`Width ${parsed.width} is too large, using maximum of ${MAX_WIDTH}`);
+      config.width = MAX_WIDTH;
+    } else {
+      config.width = parsed.width;
+    }
+  }
+
   const panels = parsed.panels as Record<string, unknown> | undefined;
 
   if (!panels || typeof panels !== "object") {
-    return { config: defaultConfig, warnings };
+    return { config, warnings };
   }
 
-  const config = getDefaultConfig();
   const customPanels: Record<string, CustomPanelConfig> = {};
   const panelOrder: string[] = [];
 

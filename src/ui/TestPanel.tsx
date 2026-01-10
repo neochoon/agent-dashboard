@@ -1,13 +1,14 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { TestResults } from "../types/index.js";
-import { PANEL_WIDTH, CONTENT_WIDTH, INNER_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate } from "./constants.js";
+import { DEFAULT_PANEL_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate, getInnerWidth, getContentWidth } from "./constants.js";
 
 interface TestPanelProps {
   results: TestResults | null;
   isOutdated: boolean;
   commitsBehind: number;
   error?: string;
+  width?: number;
 }
 
 function formatRelativeTime(timestamp: string): string {
@@ -25,8 +26,8 @@ function formatRelativeTime(timestamp: string): string {
 }
 
 // Create separator line: "├─────────────────────────────────────────────────────────┤"
-function createSeparator(): string {
-  return BOX.ml + BOX.h.repeat(INNER_WIDTH) + BOX.mr;
+function createSeparator(panelWidth: number): string {
+  return BOX.ml + BOX.h.repeat(getInnerWidth(panelWidth)) + BOX.mr;
 }
 
 export function TestPanel({
@@ -34,14 +35,18 @@ export function TestPanel({
   isOutdated,
   commitsBehind,
   error,
+  width = DEFAULT_PANEL_WIDTH,
 }: TestPanelProps): React.ReactElement {
+  const innerWidth = getInnerWidth(width);
+  const contentWidth = getContentWidth(width);
+
   // Error state
   if (error || !results) {
     return (
-      <Box flexDirection="column" width={PANEL_WIDTH}>
-        <Text>{createTitleLine("Tests", "")}</Text>
-        <Text>{BOX.v}<Text dimColor>{padLine(" " + (error || "No test results"))}</Text>{BOX.v}</Text>
-        <Text>{createBottomLine()}</Text>
+      <Box flexDirection="column" width={width}>
+        <Text>{createTitleLine("Tests", "", width)}</Text>
+        <Text>{BOX.v}<Text dimColor>{padLine(" " + (error || "No test results"), width)}</Text>{BOX.v}</Text>
+        <Text>{createBottomLine(width)}</Text>
       </Box>
     );
   }
@@ -58,18 +63,18 @@ export function TestPanel({
     summaryLength += 2 + 2 + String(results.skipped).length + " skipped".length; // "  ○ X skipped"
   }
   summaryLength += " · ".length + results.hash.length;
-  const summaryPadding = Math.max(0, INNER_WIDTH - summaryLength);
+  const summaryPadding = Math.max(0, innerWidth - summaryLength);
 
   return (
-    <Box flexDirection="column" width={PANEL_WIDTH}>
+    <Box flexDirection="column" width={width}>
       {/* Title line with relative time */}
-      <Text>{createTitleLine("Tests", relativeTime)}</Text>
+      <Text>{createTitleLine("Tests", relativeTime, width)}</Text>
 
       {/* Outdated warning */}
       {isOutdated && (
         <Text>
           {BOX.v}
-          <Text color="yellow">{padLine(` ⚠ Outdated (${commitsBehind} ${commitsBehind === 1 ? "commit" : "commits"} behind)`)}</Text>
+          <Text color="yellow">{padLine(` ⚠ Outdated (${commitsBehind} ${commitsBehind === 1 ? "commit" : "commits"} behind)`, width)}</Text>
           {BOX.v}
         </Text>
       )}
@@ -97,12 +102,12 @@ export function TestPanel({
       {/* Failures section */}
       {hasFailures && (
         <>
-          <Text dimColor>{createSeparator()}</Text>
+          <Text dimColor>{createSeparator(width)}</Text>
           {results.failures.map((failure, index) => {
-            const fileName = truncate(failure.file, CONTENT_WIDTH - 3);
-            const filePadding = Math.max(0, INNER_WIDTH - 3 - fileName.length); // " ✗ " + file
-            const testName = truncate(failure.name, CONTENT_WIDTH - 5);
-            const testPadding = Math.max(0, INNER_WIDTH - 5 - testName.length); // "   • " + name
+            const fileName = truncate(failure.file, contentWidth - 3);
+            const filePadding = Math.max(0, innerWidth - 3 - fileName.length); // " ✗ " + file
+            const testName = truncate(failure.name, contentWidth - 5);
+            const testPadding = Math.max(0, innerWidth - 5 - testName.length); // "   • " + name
             return (
               <Box key={index} flexDirection="column">
                 <Text>
@@ -121,7 +126,7 @@ export function TestPanel({
       )}
 
       {/* Bottom line */}
-      <Text>{createBottomLine()}</Text>
+      <Text>{createBottomLine(width)}</Text>
     </Box>
   );
 }

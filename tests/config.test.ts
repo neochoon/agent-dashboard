@@ -54,6 +54,12 @@ describe("getDefaultConfig", () => {
     expect(config.panels.tests.interval).toBeNull(); // manual
     expect(config.panels.tests.command).toBeUndefined();
   });
+
+  it("returns default width of 70", () => {
+    const config = getDefaultConfig();
+
+    expect(config.width).toBe(70);
+  });
 });
 
 describe("parseConfig", () => {
@@ -419,6 +425,60 @@ panels:
       // panelOrder should include all panels from config, regardless of enabled state
       // The enabled state is checked at render time
       expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+    });
+  });
+
+  describe("width setting", () => {
+    beforeEach(() => {
+      fsMock.existsSync.mockReturnValue(true);
+    });
+
+    it("uses default width when not specified", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.width).toBe(70);
+    });
+
+    it("parses custom width from config", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 80
+
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.width).toBe(80);
+    });
+
+    it("clamps width to minimum of 50", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 30
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.width).toBe(50);
+      expect(warnings).toContain("Width 30 is too small, using minimum of 50");
+    });
+
+    it("clamps width to maximum of 120", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 150
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.width).toBe(120);
+      expect(warnings).toContain("Width 150 is too large, using maximum of 120");
     });
   });
 });

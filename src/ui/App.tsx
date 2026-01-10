@@ -11,7 +11,6 @@ import { getTestData } from "../data/tests.js";
 import { getCustomPanelData, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
-import { PANEL_WIDTH } from "./constants.js";
 import type { PlanData, TestData, GenericPanelRenderer } from "../types/index.js";
 
 interface AppProps {
@@ -354,6 +353,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 stats={gitData.stats}
                 uncommitted={gitData.uncommitted}
                 countdown={mode === "watch" ? countdowns.git : null}
+                width={config.width}
               />
             </Box>
           );
@@ -368,6 +368,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 decisions={planData.decisions}
                 error={planData.error}
                 countdown={mode === "watch" ? countdowns.plan : null}
+                width={config.width}
               />
             </Box>
           );
@@ -382,6 +383,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 isOutdated={testData.isOutdated}
                 commitsBehind={testData.commitsBehind}
                 error={testData.error}
+                width={config.width}
               />
             </Box>
           );
@@ -405,6 +407,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 countdown={countdown}
                 relativeTime={relativeTime}
                 error={result.error}
+                width={config.width}
               />
             </Box>
           );
@@ -413,7 +416,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         return null;
       })}
       {mode === "watch" && (
-        <Box marginTop={1} width={PANEL_WIDTH}>
+        <Box marginTop={1} width={config.width}>
           <Text dimColor>
             {statusBarItems.map((item, index) => (
               <React.Fragment key={index}>

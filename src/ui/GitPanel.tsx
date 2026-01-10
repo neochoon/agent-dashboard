@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Commit, GitStats } from "../types/index.js";
-import { PANEL_WIDTH, CONTENT_WIDTH, INNER_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate } from "./constants.js";
+import { DEFAULT_PANEL_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate, getInnerWidth, getContentWidth } from "./constants.js";
 
 interface GitPanelProps {
   branch: string | null;
@@ -9,27 +9,29 @@ interface GitPanelProps {
   stats: GitStats;
   uncommitted?: number;
   countdown?: number | null;
+  width?: number;
 }
 
 const MAX_COMMITS = 5;
-// "• abc1234 " = 10 chars, rest for message
-const MAX_MESSAGE_LENGTH = CONTENT_WIDTH - 10;
 
 function formatCountdown(seconds: number | null | undefined): string {
   if (seconds == null) return "";
   return `↻ ${seconds}s`;
 }
 
-export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }: GitPanelProps): React.ReactElement {
+export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown, width = DEFAULT_PANEL_WIDTH }: GitPanelProps): React.ReactElement {
   const countdownSuffix = formatCountdown(countdown);
+  const innerWidth = getInnerWidth(width);
+  const contentWidth = getContentWidth(width);
+  const maxMessageLength = contentWidth - 10; // "• abc1234 " = 10 chars
 
   // Not a git repository
   if (branch === null) {
     return (
-      <Box flexDirection="column" width={PANEL_WIDTH}>
-        <Text>{createTitleLine("Git", countdownSuffix)}</Text>
-        <Text>{BOX.v}<Text dimColor>{padLine(" Not a git repository")}</Text>{BOX.v}</Text>
-        <Text>{createBottomLine()}</Text>
+      <Box flexDirection="column" width={width}>
+        <Text>{createTitleLine("Git", countdownSuffix, width)}</Text>
+        <Text>{BOX.v}<Text dimColor>{padLine(" Not a git repository", width)}</Text>{BOX.v}</Text>
+        <Text>{createBottomLine(width)}</Text>
       </Box>
     );
   }
@@ -49,18 +51,18 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }:
     statsSuffix += ` · ${uncommitted} dirty`;
   }
 
-  // Truncate branch name to fit within INNER_WIDTH
-  const availableForBranch = INNER_WIDTH - 1 - statsSuffix.length; // 1 for leading space
+  // Truncate branch name to fit within inner width
+  const availableForBranch = innerWidth - 1 - statsSuffix.length; // 1 for leading space
   const displayBranch = availableForBranch > 3 ? truncate(branch, availableForBranch) : truncate(branch, 10);
 
   // Calculate content length for padding (plain text, no ANSI codes)
   const branchLineLength = 1 + displayBranch.length + statsSuffix.length; // " " + branch + stats
-  const branchPadding = Math.max(0, INNER_WIDTH - branchLineLength);
+  const branchPadding = Math.max(0, innerWidth - branchLineLength);
 
   return (
-    <Box flexDirection="column" width={PANEL_WIDTH}>
+    <Box flexDirection="column" width={width}>
       {/* Title line with countdown */}
-      <Text>{createTitleLine("Git", countdownSuffix)}</Text>
+      <Text>{createTitleLine("Git", countdownSuffix, width)}</Text>
 
       {/* Branch and stats with colors */}
       <Text>
@@ -88,9 +90,9 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }:
         <>
           {/* Commit list */}
           {displayCommits.map((commit) => {
-            const msg = truncate(commit.message, MAX_MESSAGE_LENGTH);
+            const msg = truncate(commit.message, maxMessageLength);
             const lineLength = 3 + 7 + 1 + msg.length; // " • " + hash + " " + msg
-            const commitPadding = Math.max(0, INNER_WIDTH - lineLength);
+            const commitPadding = Math.max(0, innerWidth - lineLength);
             return (
               <Text key={commit.hash}>
                 {BOX.v} • <Text dimColor>{commit.hash.slice(0, 7)}</Text> {msg}
@@ -100,11 +102,11 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }:
           })}
         </>
       ) : (
-        <Text>{BOX.v}<Text dimColor>{padLine(" No commits today")}</Text>{BOX.v}</Text>
+        <Text>{BOX.v}<Text dimColor>{padLine(" No commits today", width)}</Text>{BOX.v}</Text>
       )}
 
       {/* Bottom line */}
-      <Text>{createBottomLine()}</Text>
+      <Text>{createBottomLine(width)}</Text>
     </Box>
   );
 }
