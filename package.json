@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:save": "npx tsx scripts/save-test-results.ts"
   },
   "repository": {
     "type": "git",
@@ -33,6 +34,7 @@
     "@types/react": "^19.2.7",
     "ink-testing-library": "^4.0.0",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"
   },

@@ -31,3 +31,24 @@ export interface PlanData {
   decisions: Decision[];
   error?: string;
 }
+
+export interface TestFailure {
+  file: string;
+  name: string;
+}
+
+export interface TestResults {
+  hash: string;
+  timestamp: string;
+  passed: number;
+  failed: number;
+  skipped: number;
+  failures: TestFailure[];
+}
+
+export interface TestData {
+  results: TestResults | null;
+  isOutdated: boolean;
+  commitsBehind: number;
+  error?: string;
+}
