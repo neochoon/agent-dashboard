@@ -3,14 +3,16 @@ import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
+import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { getGitData, type GitData } from "../data/git.js";
 import { getPlanDataWithConfig } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
+import { getCustomPanelData, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
-import { parseConfig, type Config } from "../config/parser.js";
+import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
 import { PANEL_WIDTH } from "./constants.js";
-import type { PlanData, TestData } from "../types/index.js";
+import type { PlanData, TestData, GenericPanelRenderer } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -20,6 +22,7 @@ interface AppProps {
 interface PanelCountdowns {
   git: number | null;
   plan: number | null;
+  [key: string]: number | null; // custom panels
 }
 
 interface Hotkey {
@@ -31,14 +34,16 @@ interface Hotkey {
 // Generate hotkeys for manual panels
 function generateHotkeys(
   config: Config,
-  actions: { tests?: () => void }
+  actions: {
+    tests?: () => void;
+    customPanels?: Record<string, () => void>;
+  }
 ): Hotkey[] {
   const hotkeys: Hotkey[] = [];
-  const usedKeys = new Set<string>();
+  const usedKeys = new Set<string>(["r", "q"]); // reserved
 
   // Tests panel - manual by default
   if (config.panels.tests.enabled && config.panels.tests.interval === null && actions.tests) {
-    // Use first available letter from "tests"
     const name = "tests";
     for (const char of name.toLowerCase()) {
       if (!usedKeys.has(char)) {
@@ -53,7 +58,40 @@ function generateHotkeys(
     }
   }
 
+  // Custom panels with manual interval
+  if (config.customPanels && actions.customPanels) {
+    for (const [name, panelConfig] of Object.entries(config.customPanels)) {
+      if (panelConfig.enabled && panelConfig.interval === null && actions.customPanels[name]) {
+        for (const char of name.toLowerCase()) {
+          if (!usedKeys.has(char)) {
+            usedKeys.add(char);
+            hotkeys.push({
+              key: char,
+              label: `run ${name}`,
+              action: actions.customPanels[name],
+            });
+            break;
+          }
+        }
+      }
+    }
+  }
+
   return hotkeys;
+}
+
+function formatRelativeTime(timestamp: string): string {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
 }
 
 function WelcomeApp(): React.ReactElement {
@@ -95,11 +133,60 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     setTestData(getTestDataFromConfig());
   }, [getTestDataFromConfig]);
 
-  // Per-panel countdowns
-  const [countdowns, setCountdowns] = useState<PanelCountdowns>({
-    git: gitIntervalSeconds,
-    plan: planIntervalSeconds,
+  // Custom panel data
+  const customPanelNames = useMemo(
+    () => Object.keys(config.customPanels || {}),
+    [config.customPanels]
+  );
+
+  const [customPanelData, setCustomPanelData] = useState<Record<string, CustomPanelResult>>(() => {
+    const data: Record<string, CustomPanelResult> = {};
+    if (config.customPanels) {
+      for (const [name, panelConfig] of Object.entries(config.customPanels)) {
+        if (panelConfig.enabled) {
+          data[name] = getCustomPanelData(name, panelConfig);
+        }
+      }
+    }
+    return data;
   });
+
+  const refreshCustomPanel = useCallback(
+    (name: string) => {
+      if (config.customPanels && config.customPanels[name]) {
+        setCustomPanelData((prev) => ({
+          ...prev,
+          [name]: getCustomPanelData(name, config.customPanels![name]),
+        }));
+      }
+    },
+    [config.customPanels]
+  );
+
+  // Build custom panel refresh actions for hotkeys
+  const customPanelActions = useMemo(() => {
+    const actions: Record<string, () => void> = {};
+    for (const name of customPanelNames) {
+      actions[name] = () => refreshCustomPanel(name);
+    }
+    return actions;
+  }, [customPanelNames, refreshCustomPanel]);
+
+  // Per-panel countdowns
+  const initialCountdowns = useMemo(() => {
+    const countdowns: PanelCountdowns = {
+      git: gitIntervalSeconds,
+      plan: planIntervalSeconds,
+    };
+    if (config.customPanels) {
+      for (const [name, panelConfig] of Object.entries(config.customPanels)) {
+        countdowns[name] = panelConfig.interval ? panelConfig.interval / 1000 : null;
+      }
+    }
+    return countdowns;
+  }, [gitIntervalSeconds, planIntervalSeconds, config.customPanels]);
+
+  const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
 
   const refreshAll = useCallback(() => {
     if (config.panels.git.enabled) {
@@ -113,12 +200,32 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     if (config.panels.tests.enabled) {
       refreshTest();
     }
-  }, [refreshGit, refreshPlan, refreshTest, config, gitIntervalSeconds, planIntervalSeconds]);
+    // Refresh custom panels
+    for (const name of customPanelNames) {
+      if (config.customPanels![name].enabled) {
+        refreshCustomPanel(name);
+        const interval = config.customPanels![name].interval;
+        setCountdowns((prev) => ({
+          ...prev,
+          [name]: interval ? interval / 1000 : null,
+        }));
+      }
+    }
+  }, [
+    refreshGit,
+    refreshPlan,
+    refreshTest,
+    refreshCustomPanel,
+    config,
+    gitIntervalSeconds,
+    planIntervalSeconds,
+    customPanelNames,
+  ]);
 
   // Generate hotkeys for manual panels
   const hotkeys = useMemo(
-    () => generateHotkeys(config, { tests: refreshTest }),
-    [config, refreshTest]
+    () => generateHotkeys(config, { tests: refreshTest, customPanels: customPanelActions }),
+    [config, refreshTest, customPanelActions]
   );
 
   // Per-panel refresh timers
@@ -152,21 +259,52 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       timers.push(setInterval(refreshTest, config.panels.tests.interval));
     }
 
+    // Custom panel timers
+    if (config.customPanels) {
+      for (const [name, panelConfig] of Object.entries(config.customPanels)) {
+        if (panelConfig.enabled && panelConfig.interval !== null) {
+          const intervalSeconds = panelConfig.interval / 1000;
+          timers.push(
+            setInterval(() => {
+              refreshCustomPanel(name);
+              setCountdowns((prev) => ({ ...prev, [name]: intervalSeconds }));
+            }, panelConfig.interval)
+          );
+        }
+      }
+    }
+
     return () => timers.forEach((t) => clearInterval(t));
-  }, [mode, config, refreshGit, refreshPlan, refreshTest, gitIntervalSeconds, planIntervalSeconds]);
+  }, [
+    mode,
+    config,
+    refreshGit,
+    refreshPlan,
+    refreshTest,
+    refreshCustomPanel,
+    gitIntervalSeconds,
+    planIntervalSeconds,
+  ]);
 
   // Countdown ticker - decrements every second
   useEffect(() => {
     if (mode !== "watch") return;
 
     const tick = setInterval(() => {
-      setCountdowns((prev) => ({
-        git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
-        plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
-      }));
+      setCountdowns((prev) => {
+        const next: PanelCountdowns = {
+          git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
+          plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
+        };
+        // Decrement custom panel countdowns
+        for (const name of customPanelNames) {
+          next[name] = prev[name] !== null && prev[name]! > 1 ? prev[name]! - 1 : prev[name];
+        }
+        return next;
+      });
     }, 1000);
     return () => clearInterval(tick);
-  }, [mode]);
+  }, [mode, customPanelNames]);
 
   // Keyboard shortcuts
   useInput(
@@ -195,6 +333,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }
   statusBarItems.push("r: refresh");
   statusBarItems.push("q: quit");
+
+  // Track if any built-in panel is enabled
+  const anyBuiltInEnabled =
+    config.panels.git.enabled || config.panels.plan.enabled || config.panels.tests.enabled;
 
   return (
     <Box flexDirection="column">
@@ -234,6 +376,29 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           />
         </Box>
       )}
+      {/* Custom panels */}
+      {config.customPanels &&
+        Object.entries(config.customPanels).map(([name, panelConfig], index) => {
+          if (!panelConfig.enabled) return null;
+          const result = customPanelData[name];
+          if (!result) return null;
+
+          const isManual = panelConfig.interval === null;
+          const relativeTime = isManual ? formatRelativeTime(result.timestamp) : undefined;
+          const countdown = !isManual && mode === "watch" ? countdowns[name] : null;
+
+          return (
+            <Box key={name} marginTop={anyBuiltInEnabled || index > 0 ? 1 : 0}>
+              <GenericPanel
+                data={result.data}
+                renderer={panelConfig.renderer}
+                countdown={countdown}
+                relativeTime={relativeTime}
+                error={result.error}
+              />
+            </Box>
+          );
+        })}
       {mode === "watch" && (
         <Box marginTop={1} width={PANEL_WIDTH}>
           <Text dimColor>

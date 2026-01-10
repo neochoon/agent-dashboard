@@ -134,17 +134,19 @@ panels:
   });
 
   describe("config warnings", () => {
-    it("shows warnings for invalid config", () => {
+    it("shows warnings for invalid renderer", () => {
       configFsMock.existsSync.mockReturnValue(true);
       configFsMock.readFileSync.mockReturnValue(`
 panels:
-  unknown:
+  custom:
     enabled: true
+    command: echo test
+    renderer: invalid
 `);
 
       const { lastFrame } = render(<App mode="once" />);
 
-      expect(lastFrame()).toContain("Unknown panel 'unknown'");
+      expect(lastFrame()).toContain("Invalid renderer 'invalid'");
     });
   });
 });

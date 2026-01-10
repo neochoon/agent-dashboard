@@ -46,6 +46,12 @@ export interface TestsPanelConfig extends PanelConfig {
   command?: string;
 }
 
+export interface CustomPanelConfig extends PanelConfig {
+  command?: string;
+  source?: string;
+  renderer: "list" | "progress" | "status";
+}
+
 export interface PanelsConfig {
   git: GitPanelConfig;
   plan: PlanPanelConfig;
@@ -54,6 +60,7 @@ export interface PanelsConfig {
 
 export interface Config {
   panels: PanelsConfig;
+  customPanels?: Record<string, CustomPanelConfig>;
 }
 
 export interface ParseResult {
@@ -105,7 +112,8 @@ export function getDefaultConfig(): Config {
   };
 }
 
-const VALID_PANELS = ["git", "plan", "tests"];
+const BUILTIN_PANELS = ["git", "plan", "tests"];
+const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
   const warnings: string[] = [];
@@ -137,18 +145,15 @@ export function parseConfig(): ParseResult {
   }
 
   const config = getDefaultConfig();
+  const customPanels: Record<string, CustomPanelConfig> = {};
 
   for (const panelName of Object.keys(panels)) {
-    if (!VALID_PANELS.includes(panelName)) {
-      warnings.push(`Unknown panel '${panelName}' in config`);
-      continue;
-    }
-
     const panelConfig = panels[panelName] as Record<string, unknown> | undefined;
     if (!panelConfig || typeof panelConfig !== "object") {
       continue;
     }
 
+    // Handle built-in panels
     if (panelName === "git") {
       if (typeof panelConfig.enabled === "boolean") {
         config.panels.git.enabled = panelConfig.enabled;
@@ -161,6 +166,7 @@ export function parseConfig(): ParseResult {
           config.panels.git.interval = interval;
         }
       }
+      continue;
     }
 
     if (panelName === "plan") {
@@ -178,6 +184,7 @@ export function parseConfig(): ParseResult {
       if (typeof panelConfig.source === "string") {
         config.panels.plan.source = panelConfig.source;
       }
+      continue;
     }
 
     if (panelName === "tests") {
@@ -195,7 +202,47 @@ export function parseConfig(): ParseResult {
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
       }
+      continue;
     }
+
+    // Handle custom panels (not a built-in panel)
+    const customPanel: CustomPanelConfig = {
+      enabled: typeof panelConfig.enabled === "boolean" ? panelConfig.enabled : true,
+      interval: 30000, // default 30s
+      renderer: "list", // default
+    };
+
+    // Parse interval
+    if (typeof panelConfig.interval === "string") {
+      const interval = parseInterval(panelConfig.interval);
+      customPanel.interval = interval;
+    }
+
+    // Parse command
+    if (typeof panelConfig.command === "string") {
+      customPanel.command = panelConfig.command;
+    }
+
+    // Parse source
+    if (typeof panelConfig.source === "string") {
+      customPanel.source = panelConfig.source;
+    }
+
+    // Parse renderer
+    if (typeof panelConfig.renderer === "string") {
+      if (VALID_RENDERERS.includes(panelConfig.renderer)) {
+        customPanel.renderer = panelConfig.renderer as "list" | "progress" | "status";
+      } else {
+        warnings.push(`Invalid renderer '${panelConfig.renderer}' for custom panel, using 'list'`);
+      }
+    }
+
+    customPanels[panelName] = customPanel;
+  }
+
+  // Only add customPanels if there are any
+  if (Object.keys(customPanels).length > 0) {
+    config.customPanels = customPanels;
   }
 
   return { config, warnings };
