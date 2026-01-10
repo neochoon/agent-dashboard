@@ -46,6 +46,12 @@ export interface TestsPanelConfig extends PanelConfig {
   command?: string;
 }
 
+export interface CustomPanelConfig extends PanelConfig {
+  command?: string;
+  source?: string;
+  renderer: "list" | "progress" | "status";
+}
+
 export interface PanelsConfig {
   git: GitPanelConfig;
   plan: PlanPanelConfig;
@@ -54,7 +60,14 @@ export interface PanelsConfig {
 
 export interface Config {
   panels: PanelsConfig;
+  customPanels?: Record<string, CustomPanelConfig>;
+  panelOrder: string[];
+  width: number;
 }
+
+const DEFAULT_WIDTH = 70;
+const MIN_WIDTH = 50;
+const MAX_WIDTH = 120;
 
 export interface ParseResult {
   config: Config;
@@ -102,10 +115,13 @@ export function getDefaultConfig(): Config {
         interval: null, // manual
       },
     },
+    panelOrder: ["git", "plan", "tests"],
+    width: DEFAULT_WIDTH,
   };
 }
 
-const VALID_PANELS = ["git", "plan", "tests"];
+const BUILTIN_PANELS = ["git", "plan", "tests"];
+const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
   const warnings: string[] = [];
@@ -130,25 +146,38 @@ export function parseConfig(): ParseResult {
   }
 
   const parsed = rawConfig as Record<string, unknown>;
+  const config = getDefaultConfig();
+
+  // Parse width
+  if (typeof parsed.width === "number") {
+    if (parsed.width < MIN_WIDTH) {
+      warnings.push(`Width ${parsed.width} is too small, using minimum of ${MIN_WIDTH}`);
+      config.width = MIN_WIDTH;
+    } else if (parsed.width > MAX_WIDTH) {
+      warnings.push(`Width ${parsed.width} is too large, using maximum of ${MAX_WIDTH}`);
+      config.width = MAX_WIDTH;
+    } else {
+      config.width = parsed.width;
+    }
+  }
+
   const panels = parsed.panels as Record<string, unknown> | undefined;
 
   if (!panels || typeof panels !== "object") {
-    return { config: defaultConfig, warnings };
+    return { config, warnings };
   }
 
-  const config = getDefaultConfig();
+  const customPanels: Record<string, CustomPanelConfig> = {};
+  const panelOrder: string[] = [];
 
   for (const panelName of Object.keys(panels)) {
-    if (!VALID_PANELS.includes(panelName)) {
-      warnings.push(`Unknown panel '${panelName}' in config`);
-      continue;
-    }
-
+    panelOrder.push(panelName);
     const panelConfig = panels[panelName] as Record<string, unknown> | undefined;
     if (!panelConfig || typeof panelConfig !== "object") {
       continue;
     }
 
+    // Handle built-in panels
     if (panelName === "git") {
       if (typeof panelConfig.enabled === "boolean") {
         config.panels.git.enabled = panelConfig.enabled;
@@ -161,6 +190,7 @@ export function parseConfig(): ParseResult {
           config.panels.git.interval = interval;
         }
       }
+      continue;
     }
 
     if (panelName === "plan") {
@@ -178,6 +208,7 @@ export function parseConfig(): ParseResult {
       if (typeof panelConfig.source === "string") {
         config.panels.plan.source = panelConfig.source;
       }
+      continue;
     }
 
     if (panelName === "tests") {
@@ -195,8 +226,56 @@ export function parseConfig(): ParseResult {
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
       }
+      continue;
+    }
+
+    // Handle custom panels (not a built-in panel)
+    const customPanel: CustomPanelConfig = {
+      enabled: typeof panelConfig.enabled === "boolean" ? panelConfig.enabled : true,
+      interval: 30000, // default 30s
+      renderer: "list", // default
+    };
+
+    // Parse interval
+    if (typeof panelConfig.interval === "string") {
+      const interval = parseInterval(panelConfig.interval);
+      customPanel.interval = interval;
+    }
+
+    // Parse command
+    if (typeof panelConfig.command === "string") {
+      customPanel.command = panelConfig.command;
+    }
+
+    // Parse source
+    if (typeof panelConfig.source === "string") {
+      customPanel.source = panelConfig.source;
+    }
+
+    // Parse renderer
+    if (typeof panelConfig.renderer === "string") {
+      if (VALID_RENDERERS.includes(panelConfig.renderer)) {
+        customPanel.renderer = panelConfig.renderer as "list" | "progress" | "status";
+      } else {
+        warnings.push(`Invalid renderer '${panelConfig.renderer}' for custom panel, using 'list'`);
+      }
+    }
+
+    customPanels[panelName] = customPanel;
+  }
+
+  // Only add customPanels if there are any
+  if (Object.keys(customPanels).length > 0) {
+    config.customPanels = customPanels;
+  }
+
+  // Set panel order from config, adding missing built-in panels at the end
+  for (const builtIn of BUILTIN_PANELS) {
+    if (!panelOrder.includes(builtIn)) {
+      panelOrder.push(builtIn);
     }
   }
+  config.panelOrder = panelOrder;
 
   return { config, warnings };
 }

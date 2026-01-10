@@ -53,3 +53,19 @@ export interface TestData {
   commitsBehind: number;
   error?: string;
 }
+
+// Generic panel data format
+export interface GenericPanelItem {
+  text: string;
+  status?: "done" | "pending" | "failed";
+}
+
+export interface GenericPanelData {
+  title: string;
+  summary?: string;
+  items?: GenericPanelItem[];
+  progress?: { done: number; total: number };
+  stats?: { passed: number; failed: number; skipped?: number };
+}
+
+export type GenericPanelRenderer = "list" | "progress" | "status";

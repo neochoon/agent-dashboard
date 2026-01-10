@@ -359,3 +359,164 @@ panels:
 - No config.yaml: Uses hardcoded defaults
 - Missing field: Uses default silently
 - Invalid field: Shows warning, uses default
+
+## Generic Panel Component
+
+- **Added**: 2026-01-10
+- **Issue**: #21
+- **Status**: Complete
+- **Tests**: `tests/GenericPanel.test.tsx`, `tests/config.test.ts`
+- **Source**: `src/ui/GenericPanel.tsx`, `src/data/custom.ts`, `src/config/parser.ts`
+
+### Overview
+
+GenericPanel allows users to define custom panels in config.yaml that display data from shell commands or JSON files.
+
+### Configuration
+
+```yaml
+panels:
+  # Custom panel with shell command
+  docker:
+    enabled: true
+    command: docker ps --format '{"title":"Docker","items":[...]}'
+    renderer: list
+    interval: 30s
+
+  # Custom panel with file source
+  status:
+    enabled: true
+    source: .agenthud/status.json
+    renderer: status
+    interval: manual
+```
+
+### Renderer Types
+
+| Type | Use Case | Display |
+|------|----------|---------|
+| `list` | Default, bullet points | `• item 1`<br>`• item 2` |
+| `progress` | Checklist with progress bar | `┌─ Title ──── 7/10 ███████░░░ ─┐` |
+| `status` | Pass/fail summary | `✓ 10 passed  ✗ 2 failed` |
+
+### Data Format
+
+Commands and source files should output JSON in this format:
+
+```typescript
+interface GenericPanelData {
+  title: string;           // Panel title
+  summary?: string;        // One-line summary
+  items?: Array<{
+    text: string;
+    status?: "done" | "pending" | "failed";
+  }>;
+  progress?: {
+    done: number;
+    total: number;
+  };
+  stats?: {
+    passed: number;
+    failed: number;
+    skipped?: number;
+  };
+}
+```
+
+### Examples
+
+#### List Renderer
+```json
+{
+  "title": "Docker",
+  "summary": "3 containers running",
+  "items": [
+    { "text": "nginx:latest" },
+    { "text": "redis:alpine" },
+    { "text": "postgres:15" }
+  ]
+}
+```
+
+Display:
+```
+┌─ Docker ──────────────────────────────── ↻ 25s ─┐
+│ 3 containers running                            │
+│ • nginx:latest                                  │
+│ • redis:alpine                                  │
+│ • postgres:15                                   │
+└─────────────────────────────────────────────────┘
+```
+
+#### Progress Renderer
+```json
+{
+  "title": "Build",
+  "progress": { "done": 7, "total": 10 },
+  "items": [
+    { "text": "Compile", "status": "done" },
+    { "text": "Test", "status": "done" },
+    { "text": "Deploy", "status": "pending" }
+  ]
+}
+```
+
+Display:
+```
+┌─ Build ───────────────────── 7/10 ███████░░░ ─┐
+│ ✓ Compile                                      │
+│ ✓ Test                                         │
+│ ○ Deploy                                       │
+└────────────────────────────────────────────────┘
+```
+
+#### Status Renderer
+```json
+{
+  "title": "Lint",
+  "stats": { "passed": 100, "failed": 0 }
+}
+```
+
+Display:
+```
+┌─ Lint ──────────────────────────── just now ─┐
+│ ✓ 100 passed                                  │
+└───────────────────────────────────────────────┘
+```
+
+### Line-Separated Output
+
+If the command output is not valid JSON, each line becomes an item:
+
+```bash
+# Command output:
+nginx
+redis
+postgres
+
+# Displayed as:
+┌─ Containers ─────────────────────────────────┐
+│ • nginx                                       │
+│ • redis                                       │
+│ • postgres                                    │
+└───────────────────────────────────────────────┘
+```
+
+### Hotkeys for Manual Panels
+
+Custom panels with `interval: manual` get auto-assigned hotkeys:
+- First letter of panel name
+- Next letter if conflict
+
+Status bar shows: `d: run docker · t: run tests · r: refresh · q: quit`
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `data` | `GenericPanelData` | Panel data |
+| `renderer` | `"list" \| "progress" \| "status"` | Renderer type |
+| `countdown` | `number \| null` | Countdown seconds |
+| `relativeTime` | `string` | Relative time (for manual) |
+| `error` | `string` | Error message |

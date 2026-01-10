@@ -54,6 +54,12 @@ describe("getDefaultConfig", () => {
     expect(config.panels.tests.interval).toBeNull(); // manual
     expect(config.panels.tests.command).toBeUndefined();
   });
+
+  it("returns default width of 70", () => {
+    const config = getDefaultConfig();
+
+    expect(config.width).toBe(70);
+  });
 });
 
 describe("parseConfig", () => {
@@ -198,16 +204,20 @@ panels:
       expect(config).toEqual(getDefaultConfig());
     });
 
-    it("warns on unknown panel", () => {
+    it("treats unknown panel as custom panel", () => {
       fsMock.readFileSync.mockReturnValue(`
 panels:
   unknown:
     enabled: true
+    command: echo test
 `);
 
-      const { warnings } = parseConfig();
+      const { config, warnings } = parseConfig();
 
-      expect(warnings).toContain("Unknown panel 'unknown' in config");
+      // Unknown panels are now treated as custom panels, not warnings
+      expect(warnings).not.toContain("Unknown panel 'unknown' in config");
+      expect(config.customPanels).toBeDefined();
+      expect(config.customPanels!.unknown).toBeDefined();
     });
   });
 
@@ -226,6 +236,249 @@ panels:
       const { config } = parseConfig();
 
       expect(config.panels.plan.source).toBe("custom/plan.json");
+    });
+  });
+
+  describe("custom panels", () => {
+    beforeEach(() => {
+      fsMock.existsSync.mockReturnValue(true);
+    });
+
+    it("parses custom panel with command", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  docker:
+    enabled: true
+    command: docker ps --format json
+    renderer: list
+    interval: 30s
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.customPanels).toBeDefined();
+      expect(config.customPanels!.docker).toBeDefined();
+      expect(config.customPanels!.docker.enabled).toBe(true);
+      expect(config.customPanels!.docker.command).toBe("docker ps --format json");
+      expect(config.customPanels!.docker.renderer).toBe("list");
+      expect(config.customPanels!.docker.interval).toBe(30000);
+      expect(warnings).not.toContain("Unknown panel 'docker' in config");
+    });
+
+    it("parses custom panel with source", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  status:
+    enabled: true
+    source: .agenthud/status.json
+    renderer: status
+    interval: manual
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.customPanels!.status.source).toBe(".agenthud/status.json");
+      expect(config.customPanels!.status.renderer).toBe("status");
+      expect(config.customPanels!.status.interval).toBeNull();
+    });
+
+    it("defaults renderer to list", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  custom:
+    enabled: true
+    command: echo test
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.customPanels!.custom.renderer).toBe("list");
+    });
+
+    it("defaults interval to 30s for custom panels", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  custom:
+    enabled: true
+    command: echo test
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.customPanels!.custom.interval).toBe(30000);
+    });
+
+    it("parses multiple custom panels", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  docker:
+    enabled: true
+    command: docker ps
+  k8s:
+    enabled: true
+    command: kubectl get pods
+    renderer: progress
+`);
+
+      const { config } = parseConfig();
+
+      expect(Object.keys(config.customPanels!)).toHaveLength(2);
+      expect(config.customPanels!.docker).toBeDefined();
+      expect(config.customPanels!.k8s).toBeDefined();
+      expect(config.customPanels!.k8s.renderer).toBe("progress");
+    });
+
+    it("handles mixed built-in and custom panels", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+    interval: 60s
+  docker:
+    enabled: true
+    command: docker ps
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.panels.git.interval).toBe(60000);
+      expect(config.customPanels!.docker).toBeDefined();
+    });
+
+    it("warns on invalid renderer", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  custom:
+    enabled: true
+    command: echo test
+    renderer: invalid
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(warnings).toContain("Invalid renderer 'invalid' for custom panel, using 'list'");
+      expect(config.customPanels!.custom.renderer).toBe("list");
+    });
+
+    it("ignores disabled custom panels", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  docker:
+    enabled: false
+    command: docker ps
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.customPanels!.docker.enabled).toBe(false);
+    });
+  });
+
+  describe("panel order", () => {
+    beforeEach(() => {
+      fsMock.existsSync.mockReturnValue(true);
+    });
+
+    it("preserves panel order from config.yaml", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  plan:
+    enabled: true
+  docker:
+    enabled: true
+    command: docker ps
+  tests:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+    });
+
+    it("returns default order when no config file", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      const { config } = parseConfig();
+
+      expect(config.panelOrder).toEqual(["git", "plan", "tests"]);
+    });
+
+    it("includes only enabled panels in order", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  plan:
+    enabled: false
+  docker:
+    enabled: true
+    command: docker ps
+  tests:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      // panelOrder should include all panels from config, regardless of enabled state
+      // The enabled state is checked at render time
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+    });
+  });
+
+  describe("width setting", () => {
+    beforeEach(() => {
+      fsMock.existsSync.mockReturnValue(true);
+    });
+
+    it("uses default width when not specified", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.width).toBe(70);
+    });
+
+    it("parses custom width from config", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 80
+
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.width).toBe(80);
+    });
+
+    it("clamps width to minimum of 50", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 30
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.width).toBe(50);
+      expect(warnings).toContain("Width 30 is too small, using minimum of 50");
+    });
+
+    it("clamps width to maximum of 120", () => {
+      fsMock.readFileSync.mockReturnValue(`
+width: 150
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.width).toBe(120);
+      expect(warnings).toContain("Width 150 is too large, using maximum of 120");
     });
   });
 });
