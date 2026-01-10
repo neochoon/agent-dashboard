@@ -7,6 +7,7 @@ export interface Commit {
 export interface GitStats {
   added: number;
   deleted: number;
+  files: number;
 }
 
 export interface PlanStep {

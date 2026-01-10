@@ -124,6 +124,7 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 142,   // 10 + 50 + 82
         deleted: 23,  // 2 + 10 + 11
+        files: 3,
       });
     });
 
@@ -135,6 +136,7 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 0,
         deleted: 0,
+        files: 0,
       });
     });
 
@@ -151,6 +153,7 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 50,
         deleted: 0,
+        files: 2,
       });
     });
 
@@ -167,6 +170,7 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 0,
         deleted: 10,
+        files: 2,
       });
     });
 
@@ -181,10 +185,11 @@ describe("git data module", () => {
 
       const result = getTodayStats();
 
-      // Binary files should be skipped
+      // Binary files should be skipped from line counts but counted in files
       expect(result).toEqual({
         added: 30,
         deleted: 8,
+        files: 3,
       });
     });
 
@@ -198,6 +203,7 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 0,
         deleted: 0,
+        files: 0,
       });
     });
   });

@@ -29,6 +29,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
   const displayCommits = commits.slice(0, MAX_COMMITS);
   const hasCommits = commits.length > 0;
   const commitWord = commits.length === 1 ? "commit" : "commits";
+  const fileWord = stats.files === 1 ? "file" : "files";
 
   return (
     <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
@@ -46,7 +47,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
             <Text color="green">+{stats.added}</Text>
             <Text> </Text>
             <Text color="red">-{stats.deleted}</Text>
-            <Text dimColor> · {commits.length} {commitWord}</Text>
+            <Text dimColor> · {commits.length} {commitWord} · {stats.files} {fileWord}</Text>
           </>
         )}
       </Text>

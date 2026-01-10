@@ -58,19 +58,22 @@ export function getTodayStats(): GitStats {
 
     let added = 0;
     let deleted = 0;
+    const filesSet = new Set<string>();
 
     for (const line of lines) {
-      const [addedStr, deletedStr] = line.split("\t");
+      const [addedStr, deletedStr, filename] = line.split("\t");
       // Skip binary files (shown as "-" in numstat)
       if (addedStr === "-" || deletedStr === "-") {
+        if (filename) filesSet.add(filename);
         continue;
       }
       added += parseInt(addedStr, 10) || 0;
       deleted += parseInt(deletedStr, 10) || 0;
+      if (filename) filesSet.add(filename);
     }
 
-    return { added, deleted };
+    return { added, deleted, files: filesSet.size };
   } catch {
-    return { added: 0, deleted: 0 };
+    return { added: 0, deleted: 0, files: 0 };
   }
 }
