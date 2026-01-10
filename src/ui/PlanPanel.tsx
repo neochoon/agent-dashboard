@@ -3,6 +3,9 @@ import { Box, Text } from "ink";
 import type { Plan, Decision } from "../types/index.js";
 import { PANEL_WIDTH, CONTENT_WIDTH, truncate } from "./constants.js";
 
+// Border characters
+const BOX = { tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│" };
+
 interface PlanPanelProps {
   plan: Plan | null;
   decisions: Decision[];
@@ -33,10 +36,36 @@ function createProgressBar(done: number, total: number): string {
   return "█".repeat(filled) + "░".repeat(empty);
 }
 
+// Inner width = PANEL_WIDTH - 2 (for left and right borders)
+const INNER_WIDTH = PANEL_WIDTH - 2;
+
+// Create title line: "┌─ Plan ──────────────────── 7/10 ███████░░░┐"
+function createTitleLine(done: number, total: number): string {
+  const label = " Plan ";
+  const count = ` ${done}/${total} `;
+  const bar = createProgressBar(done, total);
+  // Total = ┌(1) + ─(1) + label + dashes + count + bar + ┐(1) = PANEL_WIDTH
+  // dashes = PANEL_WIDTH - 3 - label - count - bar
+  const dashCount = PANEL_WIDTH - 3 - label.length - count.length - bar.length;
+  const dashes = BOX.h.repeat(Math.max(0, dashCount));
+  return BOX.tl + BOX.h + label + dashes + count + bar + BOX.tr;
+}
+
+// Create bottom line
+function createBottomLine(): string {
+  return BOX.bl + BOX.h.repeat(INNER_WIDTH) + BOX.br;
+}
+
+// Pad content to fit inner width (content goes between │ and │)
+function padLine(content: string): string {
+  const padding = INNER_WIDTH - content.length;
+  return content + " ".repeat(Math.max(0, padding));
+}
+
 // Create decisions header: "── Decisions ────────────────────────────────────"
 function createDecisionsHeader(): string {
   const label = "── Decisions ";
-  const remaining = CONTENT_WIDTH - label.length;
+  const remaining = INNER_WIDTH - label.length;
   return label + "─".repeat(remaining);
 }
 
@@ -44,11 +73,10 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
   // Error state
   if (error || !plan) {
     return (
-      <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
-        <Box marginTop={-1}>
-          <Text> Plan </Text>
-        </Box>
-        <Text dimColor>{error || "No plan found"}</Text>
+      <Box flexDirection="column" width={PANEL_WIDTH}>
+        <Text>{BOX.tl}{BOX.h} Plan {BOX.h.repeat(INNER_WIDTH - 7)}{BOX.tr}</Text>
+        <Text>{BOX.v}{padLine(" " + (error || "No plan found"))}{BOX.v}</Text>
+        <Text>{createBottomLine()}</Text>
       </Box>
     );
   }
@@ -57,38 +85,36 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
   const totalCount = plan.steps.length;
 
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
-      {/* Header */}
-      <Box marginTop={-1}>
-        <Text> Plan </Text>
-      </Box>
+    <Box flexDirection="column" width={PANEL_WIDTH}>
+      {/* Title line with progress bar */}
+      <Text>{createTitleLine(doneCount, totalCount)}</Text>
 
-      {/* Goal with progress */}
-      <Text>
-        {truncate(plan.goal, CONTENT_WIDTH - 18)}
-        <Text dimColor> · </Text>
-        <Text color="green">{createProgressBar(doneCount, totalCount)}</Text>
-        <Text dimColor> {doneCount}/{totalCount}</Text>
-      </Text>
+      {/* Goal */}
+      <Text>{BOX.v}{padLine(" " + truncate(plan.goal, CONTENT_WIDTH))}{BOX.v}</Text>
 
       {/* Steps */}
-      {plan.steps.map((step, index) => (
-        <Text key={index}>
-          <StatusIcon status={step.status} /> {truncate(step.step, MAX_STEP_LENGTH)}
-        </Text>
-      ))}
+      {plan.steps.map((step, index) => {
+        const stepText = " " + (step.status === "done" ? "✓" : step.status === "in-progress" ? "→" : "○") + " " + truncate(step.step, MAX_STEP_LENGTH);
+        return (
+          <Text key={index}>{BOX.v}{padLine(stepText)}{BOX.v}</Text>
+        );
+      })}
 
       {/* Decisions section (only if there are decisions) */}
       {decisions.length > 0 && (
         <>
-          <Text dimColor>{createDecisionsHeader()}</Text>
-          {decisions.map((decision, index) => (
-            <Text key={index} dimColor>
-              • {truncate(decision.decision, MAX_DECISION_LENGTH)}
-            </Text>
-          ))}
+          <Text>{BOX.v}<Text dimColor>{padLine(createDecisionsHeader())}</Text>{BOX.v}</Text>
+          {decisions.map((decision, index) => {
+            const decText = " • " + truncate(decision.decision, MAX_DECISION_LENGTH);
+            return (
+              <Text key={index}>{BOX.v}<Text dimColor>{padLine(decText)}</Text>{BOX.v}</Text>
+            );
+          })}
         </>
       )}
+
+      {/* Bottom line */}
+      <Text>{createBottomLine()}</Text>
     </Box>
   );
 }
