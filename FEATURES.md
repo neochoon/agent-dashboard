@@ -154,3 +154,63 @@ node dist/index.js --once
 | `plan` | `Plan \| null` | Plan data |
 | `decisions` | `Decision[]` | Recent decisions (max 3) |
 | `error` | `string?` | Error message |
+
+## TestPanel Component
+
+- **Added**: 2026-01-09
+- **Issue**: #11
+- **Status**: Complete
+- **Tests**: `tests/tests.test.ts`, `tests/TestPanel.test.tsx`
+- **Source**: `src/data/tests.ts`, `src/ui/TestPanel.tsx`, `scripts/save-test-results.ts`
+
+### Display
+
+```
+┌─ Tests ──────────────────────────────────┐
+│ ✓ 67 passed  ✗ 0 failed  · 860649e · 5m ago │
+└──────────────────────────────────────────┘
+```
+
+With failures:
+```
+┌─ Tests ──────────────────────────────────┐
+│ ✓ 30 passed  ✗ 2 failed  · abc1234 · 5m ago │
+├──────────────────────────────────────────┤
+│ ✗ tests/git.test.ts                      │
+│   • returns null                         │
+│ ✗ tests/App.test.tsx                     │
+│   • renders correctly                    │
+└──────────────────────────────────────────┘
+```
+
+Outdated (hash differs from HEAD):
+```
+│ ⚠ Outdated (3 commits behind)           │
+```
+
+### Saving Test Results
+
+```bash
+npm run test:save
+```
+
+Creates `.agent/test-results.json`:
+```json
+{
+  "hash": "abc1234",
+  "timestamp": "2026-01-09T16:00:00Z",
+  "passed": 67,
+  "failed": 0,
+  "skipped": 0,
+  "failures": []
+}
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `results` | `TestResults \| null` | Test results data |
+| `isOutdated` | `boolean` | Hash differs from HEAD |
+| `commitsBehind` | `number` | Commits since test run |
+| `error` | `string?` | Error message |

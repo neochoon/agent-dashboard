@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
+import { TestPanel } from "./TestPanel.js";
 import { getCurrentBranch, getTodayCommits, getTodayStats } from "../data/git.js";
 import { getPlanData } from "../data/plan.js";
-import type { Commit, GitStats, PlanData } from "../types/index.js";
+import { getTestData } from "../data/tests.js";
+import type { Commit, GitStats, PlanData, TestData } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -46,15 +48,27 @@ function usePlanData(): [PlanData, () => void] {
   return [data, refresh];
 }
 
+function useTestData(): [TestData, () => void] {
+  const [data, setData] = useState<TestData>(() => getTestData());
+
+  const refresh = useCallback(() => {
+    setData(getTestData());
+  }, []);
+
+  return [data, refresh];
+}
+
 export function App({ mode }: AppProps): React.ReactElement {
   const { exit } = useApp();
   const [gitData, refreshGit] = useGitData();
   const [planData, refreshPlan] = usePlanData();
+  const [testData, refreshTest] = useTestData();
 
   const refreshAll = useCallback(() => {
     refreshGit();
     refreshPlan();
-  }, [refreshGit, refreshPlan]);
+    refreshTest();
+  }, [refreshGit, refreshPlan, refreshTest]);
 
   // Watch mode: refresh every 5 seconds
   useEffect(() => {
@@ -91,6 +105,14 @@ export function App({ mode }: AppProps): React.ReactElement {
           plan={planData.plan}
           decisions={planData.decisions}
           error={planData.error}
+        />
+      </Box>
+      <Box marginTop={1}>
+        <TestPanel
+          results={testData.results}
+          isOutdated={testData.isOutdated}
+          commitsBehind={testData.commitsBehind}
+          error={testData.error}
         />
       </Box>
       {mode === "watch" && (
