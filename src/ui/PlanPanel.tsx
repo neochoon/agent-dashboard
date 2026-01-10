@@ -65,8 +65,9 @@ function padLine(content: string): string {
 // Create decisions header: "├─ Decisions ────────────────────────────────────┤"
 function createDecisionsHeader(): string {
   const label = "─ Decisions ";
-  const remaining = INNER_WIDTH - label.length - 1; // -1 for closing ┤
-  return label + "─".repeat(remaining) + "┤";
+  // ├(1) + label + dashes + ┤(1) = PANEL_WIDTH
+  const dashCount = PANEL_WIDTH - 1 - label.length - 1;
+  return label + "─".repeat(dashCount) + "┤";
 }
 
 export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
