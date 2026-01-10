@@ -276,10 +276,10 @@ Maintain `.agenthud/` directory:
 ## Config System
 
 - **Added**: 2026-01-10
-- **Issue**: #17
+- **Issue**: #17, #19
 - **Status**: Complete
 - **Tests**: `tests/config.test.ts`, `tests/config-integration.test.tsx`, `tests/runner.test.ts`
-- **Source**: `src/config/parser.ts`, `src/runner/command.ts`
+- **Source**: `src/config/parser.ts`, `src/runner/command.ts`, `src/data/git.ts`, `src/data/plan.ts`
 
 ### Configuration File
 
@@ -291,15 +291,20 @@ panels:
   git:
     enabled: true
     interval: 30s
+    command:
+      branch: git branch --show-current
+      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
+      stats: git log --since=midnight --numstat --pretty=format:""
 
   plan:
     enabled: true
     interval: 10s
+    source: .agenthud/plan.json
 
   tests:
     enabled: true
     interval: manual
-    # command: npm test -- --reporter=json
+    command: npm test -- --reporter=json
 ```
 
 ### Panel Options
@@ -308,8 +313,16 @@ panels:
 |--------|------|-------------|
 | `enabled` | `boolean` | Show/hide panel |
 | `interval` | `string` | Refresh interval (`30s`, `5m`, `manual`) |
+| `command` | `string/object` | Shell command(s) to run |
 | `source` | `string` | (plan only) Path to plan.json |
-| `command` | `string` | (tests only) Command to run |
+
+### Config-Driven Data
+
+| Panel | Data Source | Config Field |
+|-------|-------------|--------------|
+| Git | Shell commands | `git.command.{branch,commits,stats}` |
+| Plan | File read | `plan.source` |
+| Tests | Shell command | `tests.command` |
 
 ### Interval Values
 
