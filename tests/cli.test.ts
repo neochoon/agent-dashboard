@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { parseArgs } from "../src/cli.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  parseArgs,
+  clearScreen,
+  setClearFn,
+  resetClearFn,
+} from "../src/cli.js";
 
 describe("CLI argument parsing", () => {
   describe("parseArgs", () => {
@@ -31,6 +36,25 @@ describe("CLI argument parsing", () => {
       const result = parseArgs(["--watch", "--once"]);
 
       expect(result.mode).toBe("once");
+    });
+  });
+
+  describe("clearScreen", () => {
+    let mockClear: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockClear = vi.fn();
+      setClearFn(mockClear);
+    });
+
+    afterEach(() => {
+      resetClearFn();
+    });
+
+    it("calls the clear function", () => {
+      clearScreen();
+
+      expect(mockClear).toHaveBeenCalledTimes(1);
     });
   });
 });

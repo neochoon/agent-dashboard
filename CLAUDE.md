@@ -18,6 +18,10 @@ $ agent-dashboard --watch
 └────────────────────────────────────────────┘
 ```
 
+## Language
+
+All source code, comments, commit messages, and documentation must be written in English, regardless of the language used in conversation.
+
 ## Tech Stack
 
 - Runtime: Node.js (ES Modules)
@@ -147,7 +151,6 @@ agent-dashboard --json
 - Add features without tests
 - Make big changes without confirmation
 - Leave documentation outdated
-
 ## State Files
 
 When working on any project with agent-dashboard, maintain `.agent/` directory:

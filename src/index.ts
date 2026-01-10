@@ -2,9 +2,14 @@
 import React from "react";
 import { render } from "ink";
 import { App } from "./ui/App.js";
-import { parseArgs } from "./cli.js";
+import { parseArgs, clearScreen } from "./cli.js";
 
 const options = parseArgs(process.argv.slice(2));
+
+// Clear screen in watch mode for clean display
+if (options.mode === "watch") {
+  clearScreen();
+}
 
 const { waitUntilExit } = render(React.createElement(App, { mode: options.mode }));
 
