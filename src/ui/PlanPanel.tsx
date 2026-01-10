@@ -62,11 +62,11 @@ function padLine(content: string): string {
   return content + " ".repeat(Math.max(0, padding));
 }
 
-// Create decisions header: "── Decisions ────────────────────────────────────"
+// Create decisions header: "├─ Decisions ────────────────────────────────────┤"
 function createDecisionsHeader(): string {
-  const label = "── Decisions ";
-  const remaining = INNER_WIDTH - label.length;
-  return label + "─".repeat(remaining);
+  const label = "─ Decisions ";
+  const remaining = INNER_WIDTH - label.length - 1; // -1 for closing ┤
+  return label + "─".repeat(remaining) + "┤";
 }
 
 export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
@@ -103,7 +103,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
       {/* Decisions section (only if there are decisions) */}
       {decisions.length > 0 && (
         <>
-          <Text>{BOX.v}<Text dimColor>{padLine(createDecisionsHeader())}</Text>{BOX.v}</Text>
+          <Text>├<Text dimColor>{createDecisionsHeader()}</Text></Text>
           {decisions.map((decision, index) => {
             const decText = " • " + truncate(decision.decision, MAX_DECISION_LENGTH);
             return (
