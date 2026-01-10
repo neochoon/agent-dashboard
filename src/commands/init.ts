@@ -57,7 +57,7 @@ panels:
   tests:
     enabled: true
     interval: manual
-    # command: npm test -- --reporter=json
+    command: npm test -- --reporter=json
 `;
 
 export interface InitResult {
