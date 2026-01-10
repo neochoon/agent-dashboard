@@ -149,4 +149,64 @@ panels:
       expect(lastFrame()).toContain("Invalid renderer 'invalid'");
     });
   });
+
+  describe("panel order", () => {
+    it("renders panels in config.yaml order", () => {
+      configFsMock.existsSync.mockReturnValue(true);
+      configFsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  plan:
+    enabled: true
+  docker:
+    enabled: true
+    command: echo "nginx"
+  tests:
+    enabled: true
+`);
+
+      const { lastFrame } = render(<App mode="once" />);
+      const output = lastFrame() || "";
+
+      // Verify order by checking positions
+      const gitPos = output.indexOf("─ Git");
+      const planPos = output.indexOf("─ Plan");
+      const dockerPos = output.indexOf("─ Docker");
+      const testsPos = output.indexOf("─ Tests");
+
+      expect(gitPos).toBeLessThan(planPos);
+      expect(planPos).toBeLessThan(dockerPos);
+      expect(dockerPos).toBeLessThan(testsPos);
+    });
+
+    it("places custom panel between built-in panels", () => {
+      configFsMock.existsSync.mockReturnValue(true);
+      configFsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  docker:
+    enabled: true
+    command: echo "nginx"
+  plan:
+    enabled: true
+  tests:
+    enabled: true
+`);
+
+      const { lastFrame } = render(<App mode="once" />);
+      const output = lastFrame() || "";
+
+      // Order: git -> docker -> plan -> tests
+      const gitPos = output.indexOf("─ Git");
+      const dockerPos = output.indexOf("─ Docker");
+      const planPos = output.indexOf("─ Plan");
+      const testsPos = output.indexOf("─ Tests");
+
+      expect(gitPos).toBeLessThan(dockerPos);
+      expect(dockerPos).toBeLessThan(planPos);
+      expect(planPos).toBeLessThan(testsPos);
+    });
+  });
 });

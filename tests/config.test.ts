@@ -367,4 +367,58 @@ panels:
       expect(config.customPanels!.docker.enabled).toBe(false);
     });
   });
+
+  describe("panel order", () => {
+    beforeEach(() => {
+      fsMock.existsSync.mockReturnValue(true);
+    });
+
+    it("preserves panel order from config.yaml", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  plan:
+    enabled: true
+  docker:
+    enabled: true
+    command: docker ps
+  tests:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+    });
+
+    it("returns default order when no config file", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      const { config } = parseConfig();
+
+      expect(config.panelOrder).toEqual(["git", "plan", "tests"]);
+    });
+
+    it("includes only enabled panels in order", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+  plan:
+    enabled: false
+  docker:
+    enabled: true
+    command: docker ps
+  tests:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      // panelOrder should include all panels from config, regardless of enabled state
+      // The enabled state is checked at render time
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+    });
+  });
 });

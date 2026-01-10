@@ -334,10 +334,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   statusBarItems.push("r: refresh");
   statusBarItems.push("q: quit");
 
-  // Track if any built-in panel is enabled
-  const anyBuiltInEnabled =
-    config.panels.git.enabled || config.panels.plan.enabled || config.panels.tests.enabled;
-
   return (
     <Box flexDirection="column">
       {warnings.length > 0 && (
@@ -345,60 +341,77 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           <Text color="yellow">⚠ {warnings.join(", ")}</Text>
         </Box>
       )}
-      {config.panels.git.enabled && (
-        <Box>
-          <GitPanel
-            branch={gitData.branch}
-            commits={gitData.commits}
-            stats={gitData.stats}
-            uncommitted={gitData.uncommitted}
-            countdown={mode === "watch" ? countdowns.git : null}
-          />
-        </Box>
-      )}
-      {config.panels.plan.enabled && (
-        <Box marginTop={config.panels.git.enabled ? 1 : 0}>
-          <PlanPanel
-            plan={planData.plan}
-            decisions={planData.decisions}
-            error={planData.error}
-            countdown={mode === "watch" ? countdowns.plan : null}
-          />
-        </Box>
-      )}
-      {config.panels.tests.enabled && (
-        <Box marginTop={config.panels.git.enabled || config.panels.plan.enabled ? 1 : 0}>
-          <TestPanel
-            results={testData.results}
-            isOutdated={testData.isOutdated}
-            commitsBehind={testData.commitsBehind}
-            error={testData.error}
-          />
-        </Box>
-      )}
-      {/* Custom panels */}
-      {config.customPanels &&
-        Object.entries(config.customPanels).map(([name, panelConfig], index) => {
-          if (!panelConfig.enabled) return null;
-          const result = customPanelData[name];
+      {config.panelOrder.map((panelName, index) => {
+        const isFirst = index === 0;
+
+        // Git panel
+        if (panelName === "git" && config.panels.git.enabled) {
+          return (
+            <Box key="git" marginTop={isFirst ? 0 : 1}>
+              <GitPanel
+                branch={gitData.branch}
+                commits={gitData.commits}
+                stats={gitData.stats}
+                uncommitted={gitData.uncommitted}
+                countdown={mode === "watch" ? countdowns.git : null}
+              />
+            </Box>
+          );
+        }
+
+        // Plan panel
+        if (panelName === "plan" && config.panels.plan.enabled) {
+          return (
+            <Box key="plan" marginTop={isFirst ? 0 : 1}>
+              <PlanPanel
+                plan={planData.plan}
+                decisions={planData.decisions}
+                error={planData.error}
+                countdown={mode === "watch" ? countdowns.plan : null}
+              />
+            </Box>
+          );
+        }
+
+        // Tests panel
+        if (panelName === "tests" && config.panels.tests.enabled) {
+          return (
+            <Box key="tests" marginTop={isFirst ? 0 : 1}>
+              <TestPanel
+                results={testData.results}
+                isOutdated={testData.isOutdated}
+                commitsBehind={testData.commitsBehind}
+                error={testData.error}
+              />
+            </Box>
+          );
+        }
+
+        // Custom panel
+        const customConfig = config.customPanels?.[panelName];
+        if (customConfig && customConfig.enabled) {
+          const result = customPanelData[panelName];
           if (!result) return null;
 
-          const isManual = panelConfig.interval === null;
+          const isManual = customConfig.interval === null;
           const relativeTime = isManual ? formatRelativeTime(result.timestamp) : undefined;
-          const countdown = !isManual && mode === "watch" ? countdowns[name] : null;
+          const countdown = !isManual && mode === "watch" ? countdowns[panelName] : null;
 
           return (
-            <Box key={name} marginTop={anyBuiltInEnabled || index > 0 ? 1 : 0}>
+            <Box key={panelName} marginTop={isFirst ? 0 : 1}>
               <GenericPanel
                 data={result.data}
-                renderer={panelConfig.renderer}
+                renderer={customConfig.renderer}
                 countdown={countdown}
                 relativeTime={relativeTime}
                 error={result.error}
               />
             </Box>
           );
-        })}
+        }
+
+        return null;
+      })}
       {mode === "watch" && (
         <Box marginTop={1} width={PANEL_WIDTH}>
           <Text dimColor>

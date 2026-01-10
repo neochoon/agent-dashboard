@@ -61,6 +61,7 @@ export interface PanelsConfig {
 export interface Config {
   panels: PanelsConfig;
   customPanels?: Record<string, CustomPanelConfig>;
+  panelOrder: string[];
 }
 
 export interface ParseResult {
@@ -109,6 +110,7 @@ export function getDefaultConfig(): Config {
         interval: null, // manual
       },
     },
+    panelOrder: ["git", "plan", "tests"],
   };
 }
 
@@ -146,8 +148,10 @@ export function parseConfig(): ParseResult {
 
   const config = getDefaultConfig();
   const customPanels: Record<string, CustomPanelConfig> = {};
+  const panelOrder: string[] = [];
 
   for (const panelName of Object.keys(panels)) {
+    panelOrder.push(panelName);
     const panelConfig = panels[panelName] as Record<string, unknown> | undefined;
     if (!panelConfig || typeof panelConfig !== "object") {
       continue;
@@ -244,6 +248,14 @@ export function parseConfig(): ParseResult {
   if (Object.keys(customPanels).length > 0) {
     config.customPanels = customPanels;
   }
+
+  // Set panel order from config, adding missing built-in panels at the end
+  for (const builtIn of BUILTIN_PANELS) {
+    if (!panelOrder.includes(builtIn)) {
+      panelOrder.push(builtIn);
+    }
+  }
+  config.panelOrder = panelOrder;
 
   return { config, warnings };
 }
