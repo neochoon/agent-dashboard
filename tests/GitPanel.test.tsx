@@ -11,7 +11,7 @@ describe("GitPanel", () => {
     { hash: "890abcd", message: "Update docs", timestamp: new Date("2025-01-09T08:00:00") },
   ];
 
-  const mockStats: GitStats = { added: 142, deleted: 23 };
+  const mockStats: GitStats = { added: 142, deleted: 23, files: 5 };
 
   describe("normal display", () => {
     it("shows branch name", () => {
@@ -102,7 +102,8 @@ describe("GitPanel", () => {
         <GitPanel
           branch="main"
           commits={[]}
-          stats={{ added: 0, deleted: 0 }}
+          stats={{ added: 0, deleted: 0, files: 0 }}
+          uncommitted={0}
         />
       );
 
@@ -115,7 +116,8 @@ describe("GitPanel", () => {
         <GitPanel
           branch={null}
           commits={[]}
-          stats={{ added: 0, deleted: 0 }}
+          stats={{ added: 0, deleted: 0, files: 0 }}
+          uncommitted={0}
         />
       );
 
@@ -129,12 +131,54 @@ describe("GitPanel", () => {
         <GitPanel
           branch="main"
           commits={[mockCommits[0]]}
-          stats={{ added: 10, deleted: 5 }}
+          stats={{ added: 10, deleted: 5, files: 1 }}
+          uncommitted={0}
         />
       );
 
       expect(lastFrame()).toContain("1 commit");
       expect(lastFrame()).not.toContain("1 commits");
+    });
+  });
+
+  describe("dirty files", () => {
+    it("shows dirty file count when greater than 0", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          uncommitted={3}
+        />
+      );
+
+      expect(lastFrame()).toContain("3 dirty");
+    });
+
+    it("does not show dirty when 0", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          uncommitted={0}
+        />
+      );
+
+      expect(lastFrame()).not.toContain("dirty");
+    });
+
+    it("shows singular 'dirty' for 1 file", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          uncommitted={1}
+        />
+      );
+
+      expect(lastFrame()).toContain("1 dirty");
     });
   });
 });

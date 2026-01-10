@@ -3,7 +3,7 @@ import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
-import { getCurrentBranch, getTodayCommits, getTodayStats } from "../data/git.js";
+import { getCurrentBranch, getTodayCommits, getTodayStats, getUncommittedCount } from "../data/git.js";
 import { getPlanData } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
 import { PANEL_WIDTH } from "./constants.js";
@@ -17,6 +17,7 @@ interface GitData {
   branch: string | null;
   commits: Commit[];
   stats: GitStats;
+  uncommitted: number;
 }
 
 const REFRESH_INTERVAL = 5000; // 5 seconds
@@ -27,6 +28,7 @@ function useGitData(): [GitData, () => void] {
     branch: getCurrentBranch(),
     commits: getTodayCommits(),
     stats: getTodayStats(),
+    uncommitted: getUncommittedCount(),
   }));
 
   const refresh = useCallback(() => {
@@ -34,6 +36,7 @@ function useGitData(): [GitData, () => void] {
       branch: getCurrentBranch(),
       commits: getTodayCommits(),
       stats: getTodayStats(),
+      uncommitted: getUncommittedCount(),
     });
   }, []);
 
@@ -114,6 +117,7 @@ export function App({ mode }: AppProps): React.ReactElement {
           branch={gitData.branch}
           commits={gitData.commits}
           stats={gitData.stats}
+          uncommitted={gitData.uncommitted}
         />
       </Box>
       <Box marginTop={1}>

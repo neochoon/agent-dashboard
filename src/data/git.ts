@@ -77,3 +77,16 @@ export function getTodayStats(): GitStats {
     return { added: 0, deleted: 0, files: 0 };
   }
 }
+
+export function getUncommittedCount(): number {
+  try {
+    const result = execFn("git status --porcelain", {
+      encoding: "utf-8",
+    });
+
+    const lines = result.trim().split("\n").filter(Boolean);
+    return lines.length;
+  } catch {
+    return 0;
+  }
+}

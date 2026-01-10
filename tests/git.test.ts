@@ -3,6 +3,7 @@ import {
   getCurrentBranch,
   getTodayCommits,
   getTodayStats,
+  getUncommittedCount,
   setExecFn,
   resetExecFn,
 } from "../src/data/git.js";
@@ -205,6 +206,61 @@ describe("git data module", () => {
         deleted: 0,
         files: 0,
       });
+    });
+  });
+
+  describe("getUncommittedCount", () => {
+    // Uses git status --porcelain
+    // Output format: XY filename (one per line)
+
+    it("counts modified, added, and deleted files", () => {
+      const gitOutput = [
+        " M src/index.ts",
+        "A  src/new-file.ts",
+        " D src/deleted.ts",
+        "?? src/untracked.ts",
+      ].join("\n");
+
+      mockExec.mockReturnValue(gitOutput + "\n");
+
+      const result = getUncommittedCount();
+
+      expect(result).toBe(4);
+      expect(mockExec).toHaveBeenCalledWith("git status --porcelain", {
+        encoding: "utf-8",
+      });
+    });
+
+    it("returns 0 when working directory is clean", () => {
+      mockExec.mockReturnValue("\n");
+
+      const result = getUncommittedCount();
+
+      expect(result).toBe(0);
+    });
+
+    it("returns 0 when not in a git repository", () => {
+      mockExec.mockImplementation(() => {
+        throw new Error("fatal: not a git repository");
+      });
+
+      const result = getUncommittedCount();
+
+      expect(result).toBe(0);
+    });
+
+    it("handles staged and unstaged changes", () => {
+      const gitOutput = [
+        "MM src/both.ts",      // staged and unstaged
+        "M  src/staged.ts",    // only staged
+        " M src/unstaged.ts",  // only unstaged
+      ].join("\n");
+
+      mockExec.mockReturnValue(gitOutput + "\n");
+
+      const result = getUncommittedCount();
+
+      expect(result).toBe(3);
     });
   });
 });

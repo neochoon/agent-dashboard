@@ -7,13 +7,14 @@ interface GitPanelProps {
   branch: string | null;
   commits: Commit[];
   stats: GitStats;
+  uncommitted?: number;
 }
 
 const MAX_COMMITS = 5;
 // "• abc1234 " = 10 chars, rest for message
 const MAX_MESSAGE_LENGTH = CONTENT_WIDTH - 10;
 
-export function GitPanel({ branch, commits, stats }: GitPanelProps): React.ReactElement {
+export function GitPanel({ branch, commits, stats, uncommitted = 0 }: GitPanelProps): React.ReactElement {
   // Not a git repository
   if (branch === null) {
     return (
@@ -30,6 +31,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
   const hasCommits = commits.length > 0;
   const commitWord = commits.length === 1 ? "commit" : "commits";
   const fileWord = stats.files === 1 ? "file" : "files";
+  const hasUncommitted = uncommitted > 0;
 
   return (
     <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
@@ -47,7 +49,10 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
             <Text color="green">+{stats.added}</Text>
             <Text> </Text>
             <Text color="red">-{stats.deleted}</Text>
-            <Text dimColor> · {commits.length} {commitWord} · {stats.files} {fileWord}</Text>
+            <Text dimColor> · {commits.length} {commitWord} · {stats.files} {fileWord}{hasUncommitted ? ` · ` : ""}</Text>
+            {hasUncommitted && (
+              <Text color="yellow">{uncommitted} dirty</Text>
+            )}
           </>
         )}
       </Text>
