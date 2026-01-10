@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getPlanData, setReadFileFn, resetReadFileFn } from "../src/data/plan.js";
+import { getPlanData, getPlanDataWithConfig, setReadFileFn, resetReadFileFn } from "../src/data/plan.js";
+import type { PlanPanelConfig } from "../src/config/parser.js";
 
 describe("plan data module", () => {
   let mockReadFile: ReturnType<typeof vi.fn>;
@@ -140,6 +141,74 @@ describe("plan data module", () => {
       expect(result.decisions).toHaveLength(3);
       expect(result.decisions[0].decision).toBe("First");
       expect(result.decisions[2].decision).toBe("Third");
+    });
+  });
+
+  describe("getPlanDataWithConfig", () => {
+    it("reads from config.source path", () => {
+      const config: PlanPanelConfig = {
+        enabled: true,
+        interval: 10000,
+        source: "custom/path/plan.json",
+      };
+
+      const planJson = JSON.stringify({
+        goal: "Custom Plan",
+        steps: [{ step: "Step 1", status: "done" }],
+      });
+
+      mockReadFile.mockImplementation((path: string) => {
+        if (path === "custom/path/plan.json") return planJson;
+        throw new Error("File not found");
+      });
+
+      const result = getPlanDataWithConfig(config);
+
+      expect(result.plan?.goal).toBe("Custom Plan");
+      expect(mockReadFile).toHaveBeenCalledWith("custom/path/plan.json");
+    });
+
+    it("reads decisions from same directory as plan", () => {
+      const config: PlanPanelConfig = {
+        enabled: true,
+        interval: 10000,
+        source: "my/dir/plan.json",
+      };
+
+      const planJson = JSON.stringify({ goal: "Test", steps: [] });
+      const decisionsJson = JSON.stringify({
+        decisions: [{ timestamp: "2026-01-10T10:00:00Z", decision: "Decision 1" }],
+      });
+
+      mockReadFile.mockImplementation((path: string) => {
+        if (path === "my/dir/plan.json") return planJson;
+        if (path === "my/dir/decisions.json") return decisionsJson;
+        throw new Error("File not found");
+      });
+
+      const result = getPlanDataWithConfig(config);
+
+      expect(result.decisions).toHaveLength(1);
+      expect(result.decisions[0].decision).toBe("Decision 1");
+    });
+
+    it("uses default path when source not specified", () => {
+      const config: PlanPanelConfig = {
+        enabled: true,
+        interval: 10000,
+        source: ".agenthud/plan.json",
+      };
+
+      const planJson = JSON.stringify({ goal: "Default", steps: [] });
+
+      mockReadFile.mockImplementation((path: string) => {
+        if (path === ".agenthud/plan.json") return planJson;
+        throw new Error("File not found");
+      });
+
+      const result = getPlanDataWithConfig(config);
+
+      expect(result.plan?.goal).toBe("Default");
     });
   });
 });

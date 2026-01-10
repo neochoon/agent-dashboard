@@ -1,5 +1,6 @@
 import { execSync as nodeExecSync } from "child_process";
 import type { Commit, GitStats } from "../types/index.js";
+import type { GitPanelConfig } from "../config/parser.js";
 
 type ExecFn = (command: string, options?: { encoding: string; shell?: string }) => string;
 
@@ -89,4 +90,83 @@ export function getUncommittedCount(): number {
   } catch {
     return 0;
   }
+}
+
+// Default commands
+const DEFAULT_COMMANDS = {
+  branch: "git branch --show-current",
+  commits: 'git log --since=midnight --format="%h|%aI|%s"',
+  stats: 'git log --since=midnight --numstat --format=""',
+};
+
+export interface GitData {
+  branch: string | null;
+  commits: Commit[];
+  stats: GitStats;
+  uncommitted: number;
+}
+
+export function getGitData(config: GitPanelConfig): GitData {
+  const commands = {
+    branch: config.command?.branch || DEFAULT_COMMANDS.branch,
+    commits: config.command?.commits || DEFAULT_COMMANDS.commits,
+    stats: config.command?.stats || DEFAULT_COMMANDS.stats,
+  };
+
+  // Get branch
+  let branch: string | null = null;
+  try {
+    const result = execFn(commands.branch, { encoding: "utf-8" });
+    branch = result.trim();
+  } catch {
+    branch = null;
+  }
+
+  // Get commits
+  let commits: Commit[] = [];
+  try {
+    const result = execFn(commands.commits, { encoding: "utf-8" });
+    const lines = result.trim().split("\n").filter(Boolean);
+    commits = lines.map((line) => {
+      const [hash, timestamp, ...messageParts] = line.split("|");
+      return {
+        hash,
+        message: messageParts.join("|"),
+        timestamp: new Date(timestamp),
+      };
+    });
+  } catch {
+    commits = [];
+  }
+
+  // Get stats
+  let stats: GitStats = { added: 0, deleted: 0, files: 0 };
+  try {
+    const result = execFn(commands.stats, { encoding: "utf-8" });
+    const lines = result.trim().split("\n").filter(Boolean);
+
+    let added = 0;
+    let deleted = 0;
+    const filesSet = new Set<string>();
+
+    for (const line of lines) {
+      const [addedStr, deletedStr, filename] = line.split("\t");
+      if (addedStr === "-" || deletedStr === "-") {
+        if (filename) filesSet.add(filename);
+        continue;
+      }
+      added += parseInt(addedStr, 10) || 0;
+      deleted += parseInt(deletedStr, 10) || 0;
+      if (filename) filesSet.add(filename);
+    }
+
+    stats = { added, deleted, files: filesSet.size };
+  } catch {
+    stats = { added: 0, deleted: 0, files: 0 };
+  }
+
+  // Get uncommitted count
+  const uncommitted = getUncommittedCount();
+
+  return { branch, commits, stats, uncommitted };
 }

@@ -1,16 +1,14 @@
 {
-  "goal": "Add config system with per-panel refresh",
-  "updatedAt": "2026-01-10T21:30:00Z",
+  "goal": "Wire up config to panels",
+  "updatedAt": "2026-01-10T22:30:00Z",
   "steps": [
     { "step": "Create issue and branch", "status": "done" },
-    { "step": "Add yaml dependency", "status": "done" },
-    { "step": "Write config parser tests", "status": "done" },
-    { "step": "Implement config parser", "status": "done" },
-    { "step": "Write per-panel refresh tests", "status": "done" },
-    { "step": "Implement per-panel refresh", "status": "done" },
-    { "step": "Write command runner tests", "status": "done" },
-    { "step": "Implement command runner", "status": "done" },
-    { "step": "Update init command", "status": "done" },
+    { "step": "Write tests for config-driven git", "status": "done" },
+    { "step": "Implement config-driven git", "status": "done" },
+    { "step": "Write tests for config-driven plan", "status": "done" },
+    { "step": "Implement config-driven plan", "status": "done" },
+    { "step": "Wire up tests panel with command runner", "status": "done" },
+    { "step": "Update App.tsx", "status": "done" },
     { "step": "Update documentation", "status": "done" }
   ]
 }

@@ -3,17 +3,63 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
 import { App } from "../src/ui/App.js";
 import { setExecFn, resetExecFn } from "../src/data/git.js";
+import {
+  setFsMock as setConfigFsMock,
+  resetFsMock as resetConfigFsMock,
+  type FsMock as ConfigFsMock,
+} from "../src/config/parser.js";
+import {
+  setReadFileFn as setPlanReadFileFn,
+  resetReadFileFn as resetPlanReadFileFn,
+} from "../src/data/plan.js";
+import {
+  setReadFileFn as setTestsReadFileFn,
+  resetReadFileFn as resetTestsReadFileFn,
+} from "../src/data/tests.js";
 
 describe("App", () => {
   let mockExec: ReturnType<typeof vi.fn>;
+  let configFsMock: ConfigFsMock;
 
   beforeEach(() => {
     mockExec = vi.fn();
     setExecFn(mockExec);
+
+    // Mock config to avoid running actual npm test command
+    configFsMock = {
+      existsSync: vi.fn().mockReturnValue(true),
+      readFileSync: vi.fn().mockReturnValue(`
+panels:
+  git:
+    enabled: true
+    interval: 30s
+  plan:
+    enabled: true
+    interval: 10s
+    source: .agenthud/plan.json
+  tests:
+    enabled: true
+    interval: manual
+`),
+    };
+    setConfigFsMock(configFsMock);
+
+    // Mock plan file
+    setPlanReadFileFn(() => {
+      throw new Error("File not found");
+    });
+
+    // Mock test results file
+    setTestsReadFileFn(() => {
+      throw new Error("File not found");
+    });
   });
 
   afterEach(() => {
     resetExecFn();
+    resetConfigFsMock();
+    resetPlanReadFileFn();
+    resetTestsReadFileFn();
   });
 
   describe("rendering", () => {

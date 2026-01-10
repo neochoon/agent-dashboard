@@ -4,67 +4,21 @@ import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
-import { getCurrentBranch, getTodayCommits, getTodayStats, getUncommittedCount } from "../data/git.js";
-import { getPlanData } from "../data/plan.js";
+import { getGitData, type GitData } from "../data/git.js";
+import { getPlanDataWithConfig } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
+import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config } from "../config/parser.js";
 import { PANEL_WIDTH } from "./constants.js";
-import type { Commit, GitStats, PlanData, TestData } from "../types/index.js";
+import type { PlanData, TestData } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
   agentDirExists?: boolean;
 }
 
-interface GitData {
-  branch: string | null;
-  commits: Commit[];
-  stats: GitStats;
-  uncommitted: number;
-}
-
 const REFRESH_INTERVAL = 5000; // 5 seconds
 const REFRESH_SECONDS = REFRESH_INTERVAL / 1000;
-
-function useGitData(): [GitData, () => void] {
-  const [data, setData] = useState<GitData>(() => ({
-    branch: getCurrentBranch(),
-    commits: getTodayCommits(),
-    stats: getTodayStats(),
-    uncommitted: getUncommittedCount(),
-  }));
-
-  const refresh = useCallback(() => {
-    setData({
-      branch: getCurrentBranch(),
-      commits: getTodayCommits(),
-      stats: getTodayStats(),
-      uncommitted: getUncommittedCount(),
-    });
-  }, []);
-
-  return [data, refresh];
-}
-
-function usePlanData(): [PlanData, () => void] {
-  const [data, setData] = useState<PlanData>(() => getPlanData());
-
-  const refresh = useCallback(() => {
-    setData(getPlanData());
-  }, []);
-
-  return [data, refresh];
-}
-
-function useTestData(): [TestData, () => void] {
-  const [data, setData] = useState<TestData>(() => getTestData());
-
-  const refresh = useCallback(() => {
-    setData(getTestData());
-  }, []);
-
-  return [data, refresh];
-}
 
 function WelcomeApp(): React.ReactElement {
   return <WelcomePanel />;
@@ -76,9 +30,31 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   // Parse config once at startup
   const { config, warnings } = useMemo(() => parseConfig(), []);
 
-  const [gitData, refreshGit] = useGitData();
-  const [planData, refreshPlan] = usePlanData();
-  const [testData, refreshTest] = useTestData();
+  // Git data - uses config commands
+  const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
+  const refreshGit = useCallback(() => {
+    setGitData(getGitData(config.panels.git));
+  }, [config.panels.git]);
+
+  // Plan data - uses config source
+  const [planData, setPlanData] = useState<PlanData>(() => getPlanDataWithConfig(config.panels.plan));
+  const refreshPlan = useCallback(() => {
+    setPlanData(getPlanDataWithConfig(config.panels.plan));
+  }, [config.panels.plan]);
+
+  // Test data - uses config command or falls back to file
+  const getTestDataFromConfig = useCallback((): TestData => {
+    if (config.panels.tests.command) {
+      return runTestCommand(config.panels.tests.command);
+    }
+    return getTestData();
+  }, [config.panels.tests.command]);
+
+  const [testData, setTestData] = useState<TestData>(() => getTestDataFromConfig());
+  const refreshTest = useCallback(() => {
+    setTestData(getTestDataFromConfig());
+  }, [getTestDataFromConfig]);
+
   const [countdown, setCountdown] = useState(REFRESH_SECONDS);
 
   const refreshAll = useCallback(() => {

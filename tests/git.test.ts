@@ -4,9 +4,11 @@ import {
   getTodayCommits,
   getTodayStats,
   getUncommittedCount,
+  getGitData,
   setExecFn,
   resetExecFn,
 } from "../src/data/git.js";
+import type { GitPanelConfig } from "../src/config/parser.js";
 
 describe("git data module", () => {
   let mockExec: ReturnType<typeof vi.fn>;
@@ -261,6 +263,120 @@ describe("git data module", () => {
       const result = getUncommittedCount();
 
       expect(result).toBe(3);
+    });
+  });
+
+  describe("getGitData with config", () => {
+    it("uses custom branch command from config", () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "git rev-parse --abbrev-ref HEAD",
+        },
+      };
+
+      mockExec.mockReturnValue("feature-branch\n");
+
+      const result = getGitData(config);
+
+      expect(mockExec).toHaveBeenCalledWith(
+        "git rev-parse --abbrev-ref HEAD",
+        expect.any(Object)
+      );
+      expect(result.branch).toBe("feature-branch");
+    });
+
+    it("uses custom commits command from config", () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          commits: 'git log -5 --format="%h|%aI|%s"',
+        },
+      };
+
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("log -5")) {
+          return "abc1234|2026-01-10T10:00:00+00:00|Test commit\n";
+        }
+        if (cmd.includes("branch")) return "main\n";
+        return "\n";
+      });
+
+      const result = getGitData(config);
+
+      expect(result.commits).toHaveLength(1);
+      expect(result.commits[0].hash).toBe("abc1234");
+    });
+
+    it("uses custom stats command from config", () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          stats: 'git diff --stat HEAD~1',
+        },
+      };
+
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("diff --stat")) {
+          return "10\t5\tsrc/file.ts\n";
+        }
+        if (cmd.includes("branch")) return "main\n";
+        return "\n";
+      });
+
+      const result = getGitData(config);
+
+      expect(result.stats.added).toBe(10);
+      expect(result.stats.deleted).toBe(5);
+    });
+
+    it("uses default commands when config.command is undefined", () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+      };
+
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) return "main\n";
+        if (cmd.includes("--since=midnight")) return "\n";
+        if (cmd.includes("--porcelain")) return "\n";
+        return "\n";
+      });
+
+      const result = getGitData(config);
+
+      expect(result.branch).toBe("main");
+      expect(mockExec).toHaveBeenCalledWith(
+        "git branch --show-current",
+        expect.any(Object)
+      );
+    });
+
+    it("returns all git data in one call", () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+      };
+
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) return "main\n";
+        if (cmd.includes('--format="%h|%aI|%s"')) {
+          return "abc1234|2026-01-10T10:00:00+00:00|Commit 1\n";
+        }
+        if (cmd.includes("--numstat")) return "10\t5\tsrc/file.ts\n";
+        if (cmd.includes("--porcelain")) return " M file.ts\n";
+        return "\n";
+      });
+
+      const result = getGitData(config);
+
+      expect(result.branch).toBe("main");
+      expect(result.commits).toHaveLength(1);
+      expect(result.stats).toEqual({ added: 10, deleted: 5, files: 1 });
+      expect(result.uncommitted).toBe(1);
     });
   });
 });
