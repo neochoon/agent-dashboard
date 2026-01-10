@@ -7,11 +7,19 @@
   "bin": {
     "agent-dashboard": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "scripts"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:save": "npx tsx scripts/save-test-results.ts"
+    "test:save": "npx tsx scripts/save-test-results.ts",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -21,7 +29,10 @@
     "cli",
     "agent",
     "dashboard",
-    "monitoring"
+    "monitoring",
+    "claude",
+    "ai",
+    "terminal"
   ],
   "author": "",
   "license": "MIT",
