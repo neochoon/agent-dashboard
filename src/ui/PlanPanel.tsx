@@ -68,10 +68,14 @@ export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_P
 
   // Error state - also handle empty plan object
   if (error || !plan || !plan.goal || !plan.steps) {
+    const showTip = !error; // Show tip only when no explicit error (plan is simply missing)
     return (
       <Box flexDirection="column" width={width}>
         <Text>{createSimpleTitleLine(countdown, width)}</Text>
         <Text>{BOX.v}{padLine(" " + (error || "No plan found"), width)}{BOX.v}</Text>
+        {showTip && (
+          <Text>{BOX.v}{padLine(" Tip: Ask Claude to create .agenthud/plan.json", width)}{BOX.v}</Text>
+        )}
         <Text>{createBottomLine(width)}</Text>
       </Box>
     );

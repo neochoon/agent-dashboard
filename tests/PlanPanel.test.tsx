@@ -119,6 +119,15 @@ describe("PlanPanel", () => {
 
       expect(lastFrame()).toContain("Invalid plan.json");
     });
+
+    it("shows helpful tip when no plan is found", () => {
+      const { lastFrame } = render(
+        <PlanPanel plan={null} decisions={[]} />
+      );
+
+      expect(lastFrame()).toContain("No plan found");
+      expect(lastFrame()).toContain("Tip: Ask Claude to create .agenthud/plan.json");
+    });
   });
 
   describe("edge cases", () => {

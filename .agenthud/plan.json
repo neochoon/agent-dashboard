@@ -1,14 +1,10 @@
 {
-  "goal": "Wire up config to panels",
-  "updatedAt": "2026-01-10T22:30:00Z",
+  "goal": "Fix React duplicate key warnings",
+  "updatedAt": "2026-01-10T22:55:00Z",
   "steps": [
-    { "step": "Create issue and branch", "status": "done" },
-    { "step": "Write tests for config-driven git", "status": "done" },
-    { "step": "Implement config-driven git", "status": "done" },
-    { "step": "Write tests for config-driven plan", "status": "done" },
-    { "step": "Implement config-driven plan", "status": "done" },
-    { "step": "Wire up tests panel with command runner", "status": "done" },
-    { "step": "Update App.tsx", "status": "done" },
-    { "step": "Update documentation", "status": "done" }
+    { "step": "Identify duplicate key sources", "status": "done" },
+    { "step": "Add unique prefixes to panel list keys", "status": "done" },
+    { "step": "Verify tests pass", "status": "done" },
+    { "step": "Commit and push changes", "status": "done" }
   ]
 }
