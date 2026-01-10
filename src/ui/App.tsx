@@ -95,11 +95,13 @@ export function App({ mode }: AppProps): React.ReactElement {
 
   return (
     <Box flexDirection="column">
-      <GitPanel
-        branch={gitData.branch}
-        commits={gitData.commits}
-        stats={gitData.stats}
-      />
+      <Box>
+        <GitPanel
+          branch={gitData.branch}
+          commits={gitData.commits}
+          stats={gitData.stats}
+        />
+      </Box>
       <Box marginTop={1}>
         <PlanPanel
           plan={planData.plan}
