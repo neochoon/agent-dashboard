@@ -22,7 +22,8 @@ function createProgressBar(done: number, total: number): string {
 
 function formatCountdown(seconds: number | null | undefined): string {
   if (seconds == null) return "";
-  return `↻ ${seconds}s`;
+  const padded = String(seconds).padStart(2, " ");
+  return `↻ ${padded}s`;
 }
 
 // Create title line: "┌─ Plan ─────────── 7/10 ███████░░░ · ↻ 8s ─┐"

@@ -22,7 +22,10 @@ function createProgressBar(done: number, total: number): string {
 }
 
 function formatTitleSuffix(countdown?: number | null, relativeTime?: string): string {
-  if (countdown != null) return `↻ ${countdown}s`;
+  if (countdown != null) {
+    const padded = String(countdown).padStart(2, " ");
+    return `↻ ${padded}s`;
+  }
   if (relativeTime) return relativeTime;
   return "";
 }

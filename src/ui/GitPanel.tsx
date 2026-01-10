@@ -16,7 +16,8 @@ const MAX_COMMITS = 5;
 
 function formatCountdown(seconds: number | null | undefined): string {
   if (seconds == null) return "";
-  return `↻ ${seconds}s`;
+  const padded = String(seconds).padStart(2, " ");
+  return `↻ ${padded}s`;
 }
 
 export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown, width = DEFAULT_PANEL_WIDTH }: GitPanelProps): React.ReactElement {
