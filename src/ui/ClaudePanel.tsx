@@ -7,6 +7,7 @@ import {
   createTitleLine,
   createBottomLine,
   getInnerWidth,
+  getDisplayWidth,
 } from "./constants.js";
 
 interface ClaudePanelProps {
@@ -42,44 +43,6 @@ function formatActivityTime(date: Date): string {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${hours}:${minutes}:${seconds}`;
-}
-
-/**
- * Calculate the display width of a string in the terminal.
- * Emojis typically display as 2 characters wide.
- */
-function getDisplayWidth(str: string): number {
-  let width = 0;
-  for (const char of str) {
-    const code = char.codePointAt(0) || 0;
-    // Emoji ranges
-    if (
-      (code >= 0x1F300 && code <= 0x1F9FF) || // Misc symbols, emoticons, etc.
-      (code >= 0x2600 && code <= 0x26FF) ||   // Misc symbols
-      (code >= 0x2700 && code <= 0x27BF) ||   // Dingbats (includes ✏)
-      (code >= 0x1F600 && code <= 0x1F64F) || // Emoticons
-      (code >= 0x1F680 && code <= 0x1F6FF)    // Transport symbols
-    ) {
-      width += 2;
-    } else if (code === 0xFE0F) {
-      // Variation selector - skip (already counted in base emoji)
-      continue;
-    } else if (
-      // CJK characters (Korean, Chinese, Japanese) - 2 wide
-      (code >= 0xAC00 && code <= 0xD7AF) ||   // Korean Hangul syllables
-      (code >= 0x1100 && code <= 0x11FF) ||   // Korean Hangul Jamo
-      (code >= 0x3130 && code <= 0x318F) ||   // Korean Hangul Compatibility Jamo
-      (code >= 0x4E00 && code <= 0x9FFF) ||   // CJK Unified Ideographs
-      (code >= 0x3400 && code <= 0x4DBF) ||   // CJK Extension A
-      (code >= 0x3000 && code <= 0x303F) ||   // CJK Symbols
-      (code >= 0xFF00 && code <= 0xFFEF)      // Fullwidth forms
-    ) {
-      width += 2;
-    } else {
-      width += 1;
-    }
-  }
-  return width;
 }
 
 function formatActivityLine(activity: ActivityEntry, maxWidth: number): { text: string; displayWidth: number } {
