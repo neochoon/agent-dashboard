@@ -106,11 +106,8 @@ export function ClaudePanel({
   const { state } = data;
   const statusIcon = getStatusIcon(state.status);
 
-  // Build title suffix
-  let titleSuffix = countdownSuffix;
-  if (state.status !== "none" && statusIcon) {
-    titleSuffix = statusIcon;
-  }
+  // Build title suffix (countdown only, like other panels)
+  const titleSuffix = countdownSuffix;
 
   // Error state
   if (data.error) {

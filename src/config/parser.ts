@@ -121,7 +121,7 @@ export function getDefaultConfig(): Config {
       },
       claude: {
         enabled: true,
-        interval: 2000, // 2 seconds for real-time monitoring
+        interval: 10000, // 10 seconds default
       },
     },
     panelOrder: ["project", "git", "tests", "claude"],
