@@ -299,7 +299,7 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
           for (const block of messageContent) {
             if (block.type === "tool_use") {
               const toolName = block.name || "Tool";
-              const icon = TOOL_ICONS[toolName] || "🔧";
+              const icon = TOOL_ICONS[toolName] || "$";
               const detail = getToolDetail(toolName, block.input);
 
               activities.push({
