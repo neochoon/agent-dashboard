@@ -90,19 +90,19 @@ const MAX_LINES_TO_SCAN = 200;
 const MAX_ACTIVITIES = 10;
 const MAX_DETAIL_LENGTH = 45;
 
-// Tool icons mapping
+// Tool icons mapping (ASCII only for consistent terminal width)
 const TOOL_ICONS: Record<string, string> = {
-  Edit: "✏️",
-  Write: "✏️",
-  Read: "📖",
-  Bash: "🔧",
-  Glob: "🔍",
-  Grep: "🔍",
-  WebFetch: "🌐",
-  WebSearch: "🌐",
-  Task: "📋",
-  TodoWrite: "📝",
-  AskUserQuestion: "❓",
+  Edit: "~",
+  Write: "~",
+  Read: ".",
+  Bash: "$",
+  Glob: "*",
+  Grep: "/",
+  WebFetch: "@",
+  WebSearch: "@",
+  Task: "#",
+  TodoWrite: "+",
+  AskUserQuestion: "?",
 };
 
 /**
@@ -280,7 +280,7 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
           activities.push({
             timestamp: lastTimestamp || new Date(),
             type: "user",
-            icon: "👤",
+            icon: ">",
             label: "User",
             detail: truncate(userText.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
           });
@@ -316,7 +316,7 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
                 activities.push({
                   timestamp: lastTimestamp || new Date(),
                   type: "response",
-                  icon: "🤖",
+                  icon: "<",
                   label: "Response",
                   detail: truncate(block.text.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
                 });
