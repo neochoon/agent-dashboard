@@ -88,10 +88,10 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   const label = activity.label;
   const detail = activity.detail;
 
-  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = 2 display width, " " = 1, label, ": " = 2
+  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = varies, " " = 1, label, ": " = 2
   const timestamp = `[${time}] `;
   const timestampWidth = timestamp.length; // 12
-  const iconWidth = 2; // Emoji icons are 2-wide
+  const iconWidth = getDisplayWidth(icon); // Use actual icon width (emojis are typically 2-wide)
   const labelWidth = label.length;
   const separatorWidth = detail ? 2 : 0; // ": " if there's detail
 

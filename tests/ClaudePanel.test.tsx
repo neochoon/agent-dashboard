@@ -416,6 +416,130 @@ describe("ClaudePanel", () => {
     });
   });
 
+  describe("responsive width", () => {
+    it("panel border width matches content line width", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: [
+            {
+              timestamp: new Date("2025-01-12T10:30:00"),
+              type: "tool",
+              icon: "🔧",
+              label: "Bash",
+              detail: "test command",
+            },
+          ],
+          tokenCount: 0,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} width={120} />);
+      const output = lastFrame() || "";
+      const lines = output.split("\n");
+
+      // Get actual line lengths (excluding ANSI codes)
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+
+      const titleLine = stripAnsi(lines[0]); // ┌─ Claude ─...─┐
+      const contentLine = stripAnsi(lines[1]); // │ [HH:MM:SS] ...│
+      const bottomLine = stripAnsi(lines[2]); // └─...─┘
+
+      // All lines must have the same visual length
+      expect(titleLine.length).toBe(120);
+      expect(contentLine.length).toBe(120);
+      expect(bottomLine.length).toBe(120);
+    });
+
+    it("handles different emoji icons correctly", () => {
+      // Test with different emoji icons to ensure width calculation is correct
+      const activities: ActivityEntry[] = [
+        { timestamp: new Date("2025-01-12T10:30:00"), type: "user", icon: "💬", label: "User", detail: "hello world" },
+        { timestamp: new Date("2025-01-12T10:30:01"), type: "response", icon: "🤖", label: "Response", detail: "hi there" },
+        { timestamp: new Date("2025-01-12T10:30:02"), type: "tool", icon: "🔧", label: "Bash", detail: "npm test" },
+        { timestamp: new Date("2025-01-12T10:30:03"), type: "tool", icon: "📝", label: "Edit", detail: "file.ts" },
+        { timestamp: new Date("2025-01-12T10:30:04"), type: "tool", icon: "🔍", label: "Grep", detail: "pattern" },
+      ];
+
+      const data = createMockData({
+        state: { status: "running", activities, tokenCount: 0 },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} width={100} />);
+      const output = lastFrame() || "";
+      const lines = output.split("\n");
+
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+
+      // All content lines should have the same width
+      const contentLines = lines.slice(1, -1); // Exclude title and bottom
+      const widths = contentLines.map((line) => stripAnsi(line).length);
+
+      // All should be 100
+      widths.forEach((w) => expect(w).toBe(100));
+    });
+
+    it("uses full width for long details when width is large", () => {
+      // At width 120: contentWidth=117, prefix=21, available=96 chars for detail
+      // This detail is 90 chars - should fit without truncation at width 120
+      const detail90chars = "npm run build && npm run test && npm run lint && npm run format && npm run typecheck";
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: [
+            {
+              timestamp: new Date("2025-01-12T10:30:00"),
+              type: "tool",
+              icon: "🔧",
+              label: "Bash",
+              detail: detail90chars,
+            },
+          ],
+          tokenCount: 0,
+        },
+      });
+
+      // Wide panel (120 chars) - content should NOT be truncated
+      const { lastFrame } = render(<ClaudePanel data={data} width={120} />);
+      const output = lastFrame() || "";
+
+      // Should contain the full detail without truncation
+      expect(output).toContain(detail90chars);
+      expect(output).not.toContain("...");
+    });
+
+    it("truncates at narrow width but not at wide width", () => {
+      // This detail is 60 chars - should truncate at width 60, but fit at width 120
+      const detail60chars = "npm run build && npm run test && npm run lint && npm run";
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: [
+            {
+              timestamp: new Date("2025-01-12T10:30:00"),
+              type: "tool",
+              icon: "🔧",
+              label: "Bash",
+              detail: detail60chars,
+            },
+          ],
+          tokenCount: 0,
+        },
+      });
+
+      // Narrow panel (60 chars) - at width 60: contentWidth=57, prefix=21, available=36
+      // 60 char detail > 36 available, so should truncate
+      const narrowResult = render(<ClaudePanel data={data} width={60} />);
+      expect(narrowResult.lastFrame()).toContain("...");
+      expect(narrowResult.lastFrame()).not.toContain(detail60chars);
+
+      // Wide panel (120 chars) - should NOT truncate
+      const wideResult = render(<ClaudePanel data={data} width={120} />);
+      expect(wideResult.lastFrame()).toContain(detail60chars);
+      expect(wideResult.lastFrame()).not.toContain("...");
+    });
+  });
+
   describe("visual hierarchy - rendering", () => {
     it("renders all activity types without error", () => {
       const mixedActivities: ActivityEntry[] = [

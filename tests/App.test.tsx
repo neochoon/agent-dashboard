@@ -18,6 +18,9 @@ import {
   type FsMock as ClaudeFsMock,
 } from "../src/data/claude.js";
 
+// Helper to strip ANSI codes
+const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+
 describe("App", () => {
   let mockExec: ReturnType<typeof vi.fn>;
   let configFsMock: ConfigFsMock;
@@ -135,6 +138,36 @@ panels:
 
       expect(lastFrame()).not.toContain("↻");
       expect(lastFrame()).not.toContain("quit");
+    });
+  });
+
+  describe("responsive width", () => {
+    it("renders all panel lines with consistent width", () => {
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) {
+          return "main\n";
+        }
+        return "";
+      });
+
+      const { lastFrame } = render(<App mode="once" />);
+      const output = lastFrame() || "";
+      const lines = output.split("\n").filter((line) => line.trim());
+
+      // Find panel border lines (contain box drawing characters)
+      const panelLines = lines.filter(
+        (line) => line.includes("┌") || line.includes("│") || line.includes("└")
+      );
+
+      // All panel lines should have the same width
+      const widths = panelLines.map((line) => stripAnsi(line).length);
+      const uniqueWidths = [...new Set(widths)];
+
+      // There should be only one unique width (all lines same width)
+      expect(uniqueWidths.length).toBe(1);
+      // Width should be consistent (either fallback 80 or detected)
+      expect(widths[0]).toBeGreaterThanOrEqual(50);
+      expect(widths[0]).toBeLessThanOrEqual(120);
     });
   });
 });
