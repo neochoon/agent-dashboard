@@ -4,16 +4,18 @@ import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
 import { ProjectPanel } from "./ProjectPanel.js";
+import { ClaudePanel } from "./ClaudePanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
 import { getPlanDataWithConfig } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
 import { getProjectData, type ProjectData } from "../data/project.js";
+import { getClaudeData } from "../data/claude.js";
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
-import type { PlanData, TestData, GenericPanelRenderer } from "../types/index.js";
+import type { PlanData, TestData, ClaudeData, GenericPanelRenderer } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -24,6 +26,7 @@ interface PanelCountdowns {
   project: number | null;
   git: number | null;
   plan: number | null;
+  claude: number | null;
   [key: string]: number | null; // custom panels
 }
 
@@ -39,6 +42,7 @@ interface PanelVisualStates {
   git: VisualFeedback;
   plan: VisualFeedback;
   tests: VisualFeedback;
+  claude: VisualFeedback;
   [key: string]: VisualFeedback; // custom panels
 }
 
@@ -133,6 +137,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
   const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
   const planIntervalSeconds = config.panels.plan.interval ? config.panels.plan.interval / 1000 : null;
+  const claudeIntervalSeconds = config.panels.claude.interval ? config.panels.claude.interval / 1000 : null;
+
+  // Get current working directory for Claude session lookup
+  const cwd = process.cwd();
 
   // Project data
   const [projectData, setProjectData] = useState<ProjectData>(() => getProjectData());
@@ -164,6 +172,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const refreshTest = useCallback(() => {
     setTestData(getTestDataFromConfig());
   }, [getTestDataFromConfig]);
+
+  // Claude data
+  const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd));
+  const refreshClaude = useCallback(() => {
+    setClaudeData(getClaudeData(cwd));
+  }, [cwd]);
 
   // Custom panel data
   const customPanelNames = useMemo(
@@ -201,6 +215,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       project: projectIntervalSeconds,
       git: gitIntervalSeconds,
       plan: planIntervalSeconds,
+      claude: claudeIntervalSeconds,
     };
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
@@ -208,7 +223,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       }
     }
     return countdowns;
-  }, [projectIntervalSeconds, gitIntervalSeconds, planIntervalSeconds, config.customPanels]);
+  }, [projectIntervalSeconds, gitIntervalSeconds, planIntervalSeconds, claudeIntervalSeconds, config.customPanels]);
 
   const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
 
@@ -219,6 +234,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       git: { ...DEFAULT_VISUAL_STATE },
       plan: { ...DEFAULT_VISUAL_STATE },
       tests: { ...DEFAULT_VISUAL_STATE },
+      claude: { ...DEFAULT_VISUAL_STATE },
     };
     for (const name of customPanelNames) {
       states[name] = { ...DEFAULT_VISUAL_STATE };
@@ -306,6 +322,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     clearFeedback("plan", "justRefreshed");
   }, [config.panels.plan, setVisualState, clearFeedback]);
 
+  // Claude panel refresh with visual feedback (file-based)
+  const refreshClaudeWithFeedback = useCallback(() => {
+    setClaudeData(getClaudeData(cwd));
+    setVisualState("claude", { justRefreshed: true });
+    clearFeedback("claude", "justRefreshed");
+  }, [cwd, setVisualState, clearFeedback]);
+
   // Build custom panel refresh actions for hotkeys (async)
   const customPanelActionsAsync = useMemo(() => {
     const actions: Record<string, () => void> = {};
@@ -331,6 +354,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     if (config.panels.tests.enabled) {
       void refreshTestAsync();
     }
+    if (config.panels.claude.enabled) {
+      refreshClaudeWithFeedback();
+      setCountdowns((prev) => ({ ...prev, claude: claudeIntervalSeconds }));
+    }
     // Refresh custom panels
     for (const name of customPanelNames) {
       if (config.customPanels![name].enabled) {
@@ -347,11 +374,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     refreshGitAsync,
     refreshPlanWithFeedback,
     refreshTestAsync,
+    refreshClaudeWithFeedback,
     refreshCustomPanelAsync,
     config,
     projectIntervalSeconds,
     gitIntervalSeconds,
     planIntervalSeconds,
+    claudeIntervalSeconds,
     customPanelNames,
   ]);
 
@@ -405,6 +434,16 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       timers.push(setInterval(() => void refreshTestAsync(), config.panels.tests.interval));
     }
 
+    // Claude panel timer
+    if (config.panels.claude.enabled && config.panels.claude.interval !== null) {
+      timers.push(
+        setInterval(() => {
+          refreshClaudeWithFeedback();
+          setCountdowns((prev) => ({ ...prev, claude: claudeIntervalSeconds }));
+        }, config.panels.claude.interval)
+      );
+    }
+
     // Custom panel timers
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
@@ -428,10 +467,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     refreshGitAsync,
     refreshPlanWithFeedback,
     refreshTestAsync,
+    refreshClaudeWithFeedback,
     refreshCustomPanelAsync,
     projectIntervalSeconds,
     gitIntervalSeconds,
     planIntervalSeconds,
+    claudeIntervalSeconds,
   ]);
 
   // Countdown ticker - decrements every second
@@ -444,6 +485,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           project: prev.project !== null && prev.project > 1 ? prev.project - 1 : prev.project,
           git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
           plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
+          claude: prev.claude !== null && prev.claude > 1 ? prev.claude - 1 : prev.claude,
         };
         // Decrement custom panel countdowns
         for (const name of customPanelNames) {
@@ -557,6 +599,21 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 width={config.width}
                 isRunning={testsVisual.isRunning}
                 justCompleted={testsVisual.justCompleted}
+              />
+            </Box>
+          );
+        }
+
+        // Claude panel
+        if (panelName === "claude" && config.panels.claude.enabled) {
+          const claudeVisual = visualStates.claude || DEFAULT_VISUAL_STATE;
+          return (
+            <Box key={`panel-claude-${index}`} marginTop={isFirst ? 0 : 1}>
+              <ClaudePanel
+                data={claudeData}
+                countdown={mode === "watch" ? countdowns.claude : null}
+                width={config.width}
+                justRefreshed={claudeVisual.justRefreshed}
               />
             </Box>
           );

@@ -44,10 +44,15 @@ export interface PlanPanelConfig extends PanelConfig {
 
 export interface TestsPanelConfig extends PanelConfig {
   command?: string;
+  source?: string;
 }
 
 export interface ProjectPanelConfig extends PanelConfig {
   // Project panel has no special config, just enabled and interval
+}
+
+export interface ClaudePanelConfig extends PanelConfig {
+  // Claude panel has no special config, just enabled and interval
 }
 
 export interface CustomPanelConfig extends PanelConfig {
@@ -61,6 +66,7 @@ export interface PanelsConfig {
   git: GitPanelConfig;
   plan: PlanPanelConfig;
   tests: TestsPanelConfig;
+  claude: ClaudePanelConfig;
 }
 
 export interface Config {
@@ -123,13 +129,17 @@ export function getDefaultConfig(): Config {
         enabled: true,
         interval: null, // manual
       },
+      claude: {
+        enabled: true,
+        interval: 2000, // 2 seconds for real-time monitoring
+      },
     },
-    panelOrder: ["project", "git", "plan", "tests"],
+    panelOrder: ["project", "git", "plan", "tests", "claude"],
     width: DEFAULT_WIDTH,
   };
 }
 
-const BUILTIN_PANELS = ["project", "git", "plan", "tests"];
+const BUILTIN_PANELS = ["project", "git", "plan", "tests", "claude"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
@@ -249,6 +259,21 @@ export function parseConfig(): ParseResult {
       }
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
+      }
+      continue;
+    }
+
+    if (panelName === "claude") {
+      if (typeof panelConfig.enabled === "boolean") {
+        config.panels.claude.enabled = panelConfig.enabled;
+      }
+      if (typeof panelConfig.interval === "string") {
+        const interval = parseInterval(panelConfig.interval);
+        if (interval === null && panelConfig.interval !== "manual") {
+          warnings.push(`Invalid interval '${panelConfig.interval}' for claude panel, using default`);
+        } else {
+          config.panels.claude.interval = interval;
+        }
       }
       continue;
     }
