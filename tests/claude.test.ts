@@ -389,7 +389,7 @@ describe("claude data module", () => {
       // Activities are in reverse order (most recent first)
       expect(result.activities[0].icon).toBe("🔍"); // Grep
       expect(result.activities[1].icon).toBe("🔧"); // Bash
-      expect(result.activities[2].icon).toBe("✏️"); // Edit
+      expect(result.activities[2].icon).toBe("📝"); // Edit
     });
 
     it("handles empty file gracefully", () => {

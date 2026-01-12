@@ -92,8 +92,8 @@ const MAX_DETAIL_LENGTH = 45;
 
 // Tool icons mapping
 const TOOL_ICONS: Record<string, string> = {
-  Edit: "✏️",
-  Write: "✏️",
+  Edit: "📝",
+  Write: "📝",
   Read: "📖",
   Bash: "🔧",
   Glob: "🔍",
