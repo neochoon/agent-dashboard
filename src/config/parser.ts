@@ -38,10 +38,6 @@ export interface GitPanelConfig extends PanelConfig {
   };
 }
 
-export interface PlanPanelConfig extends PanelConfig {
-  source: string;
-}
-
 export interface TestsPanelConfig extends PanelConfig {
   command?: string;
   source?: string;
@@ -64,7 +60,6 @@ export interface CustomPanelConfig extends PanelConfig {
 export interface PanelsConfig {
   project: ProjectPanelConfig;
   git: GitPanelConfig;
-  plan: PlanPanelConfig;
   tests: TestsPanelConfig;
   claude: ClaudePanelConfig;
 }
@@ -120,11 +115,6 @@ export function getDefaultConfig(): Config {
         enabled: true,
         interval: 30000, // 30s
       },
-      plan: {
-        enabled: true,
-        interval: 10000, // 10s
-        source: ".agenthud/plan/plan.json",
-      },
       tests: {
         enabled: true,
         interval: null, // manual
@@ -134,12 +124,12 @@ export function getDefaultConfig(): Config {
         interval: 2000, // 2 seconds for real-time monitoring
       },
     },
-    panelOrder: ["project", "git", "plan", "tests", "claude"],
+    panelOrder: ["project", "git", "tests", "claude"],
     width: DEFAULT_WIDTH,
   };
 }
 
-const BUILTIN_PANELS = ["project", "git", "plan", "tests", "claude"];
+const BUILTIN_PANELS = ["project", "git", "tests", "claude"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
@@ -223,24 +213,6 @@ export function parseConfig(): ParseResult {
         } else {
           config.panels.git.interval = interval;
         }
-      }
-      continue;
-    }
-
-    if (panelName === "plan") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.plan.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for plan panel, using default`);
-        } else {
-          config.panels.plan.interval = interval;
-        }
-      }
-      if (typeof panelConfig.source === "string") {
-        config.panels.plan.source = panelConfig.source;
       }
       continue;
     }

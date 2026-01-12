@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
-import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
 import { ProjectPanel } from "./ProjectPanel.js";
 import { ClaudePanel } from "./ClaudePanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
-import { getPlanDataWithConfig } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
 import { getProjectData, type ProjectData } from "../data/project.js";
 import { getClaudeData } from "../data/claude.js";
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
-import type { PlanData, TestData, ClaudeData, GenericPanelRenderer } from "../types/index.js";
+import type { TestData, ClaudeData, GenericPanelRenderer } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -25,7 +23,6 @@ interface AppProps {
 interface PanelCountdowns {
   project: number | null;
   git: number | null;
-  plan: number | null;
   claude: number | null;
   [key: string]: number | null; // custom panels
 }
@@ -40,7 +37,6 @@ interface VisualFeedback {
 interface PanelVisualStates {
   project: VisualFeedback;
   git: VisualFeedback;
-  plan: VisualFeedback;
   tests: VisualFeedback;
   claude: VisualFeedback;
   [key: string]: VisualFeedback; // custom panels
@@ -136,7 +132,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   // Calculate interval in seconds for display
   const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
   const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
-  const planIntervalSeconds = config.panels.plan.interval ? config.panels.plan.interval / 1000 : null;
   const claudeIntervalSeconds = config.panels.claude.interval ? config.panels.claude.interval / 1000 : null;
 
   // Get current working directory for Claude session lookup
@@ -153,12 +148,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const refreshGit = useCallback(() => {
     setGitData(getGitData(config.panels.git));
   }, [config.panels.git]);
-
-  // Plan data - uses config source
-  const [planData, setPlanData] = useState<PlanData>(() => getPlanDataWithConfig(config.panels.plan));
-  const refreshPlan = useCallback(() => {
-    setPlanData(getPlanDataWithConfig(config.panels.plan));
-  }, [config.panels.plan]);
 
   // Test data - uses config command or falls back to file
   const getTestDataFromConfig = useCallback((): TestData => {
@@ -214,7 +203,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     const countdowns: PanelCountdowns = {
       project: projectIntervalSeconds,
       git: gitIntervalSeconds,
-      plan: planIntervalSeconds,
       claude: claudeIntervalSeconds,
     };
     if (config.customPanels) {
@@ -223,7 +211,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       }
     }
     return countdowns;
-  }, [projectIntervalSeconds, gitIntervalSeconds, planIntervalSeconds, claudeIntervalSeconds, config.customPanels]);
+  }, [projectIntervalSeconds, gitIntervalSeconds, claudeIntervalSeconds, config.customPanels]);
 
   const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
 
@@ -232,7 +220,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     const states: PanelVisualStates = {
       project: { ...DEFAULT_VISUAL_STATE },
       git: { ...DEFAULT_VISUAL_STATE },
-      plan: { ...DEFAULT_VISUAL_STATE },
       tests: { ...DEFAULT_VISUAL_STATE },
       claude: { ...DEFAULT_VISUAL_STATE },
     };
@@ -315,13 +302,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     }
   }, [getTestDataFromConfig, setVisualState, clearFeedback]);
 
-  // Plan panel refresh with visual feedback (file-based, not command)
-  const refreshPlanWithFeedback = useCallback(() => {
-    setPlanData(getPlanDataWithConfig(config.panels.plan));
-    setVisualState("plan", { justRefreshed: true });
-    clearFeedback("plan", "justRefreshed");
-  }, [config.panels.plan, setVisualState, clearFeedback]);
-
   // Claude panel refresh with visual feedback (file-based)
   const refreshClaudeWithFeedback = useCallback(() => {
     setClaudeData(getClaudeData(cwd));
@@ -347,10 +327,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       void refreshGitAsync();
       setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
     }
-    if (config.panels.plan.enabled) {
-      refreshPlanWithFeedback();
-      setCountdowns((prev) => ({ ...prev, plan: planIntervalSeconds }));
-    }
     if (config.panels.tests.enabled) {
       void refreshTestAsync();
     }
@@ -372,14 +348,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [
     refreshProjectWithFeedback,
     refreshGitAsync,
-    refreshPlanWithFeedback,
     refreshTestAsync,
     refreshClaudeWithFeedback,
     refreshCustomPanelAsync,
     config,
     projectIntervalSeconds,
     gitIntervalSeconds,
-    planIntervalSeconds,
     claudeIntervalSeconds,
     customPanelNames,
   ]);
@@ -419,16 +393,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       );
     }
 
-    // Plan panel timer
-    if (config.panels.plan.enabled && config.panels.plan.interval !== null) {
-      timers.push(
-        setInterval(() => {
-          refreshPlanWithFeedback();
-          setCountdowns((prev) => ({ ...prev, plan: planIntervalSeconds }));
-        }, config.panels.plan.interval)
-      );
-    }
-
     // Tests panel timer (null = manual, no timer)
     if (config.panels.tests.enabled && config.panels.tests.interval !== null) {
       timers.push(setInterval(() => void refreshTestAsync(), config.panels.tests.interval));
@@ -465,13 +429,11 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     config,
     refreshProjectWithFeedback,
     refreshGitAsync,
-    refreshPlanWithFeedback,
     refreshTestAsync,
     refreshClaudeWithFeedback,
     refreshCustomPanelAsync,
     projectIntervalSeconds,
     gitIntervalSeconds,
-    planIntervalSeconds,
     claudeIntervalSeconds,
   ]);
 
@@ -484,7 +446,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         const next: PanelCountdowns = {
           project: prev.project !== null && prev.project > 1 ? prev.project - 1 : prev.project,
           git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
-          plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
           claude: prev.claude !== null && prev.claude > 1 ? prev.claude - 1 : prev.claude,
         };
         // Decrement custom panel countdowns
@@ -564,23 +525,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 width={config.width}
                 isRunning={gitVisual.isRunning}
                 justRefreshed={gitVisual.justRefreshed}
-              />
-            </Box>
-          );
-        }
-
-        // Plan panel
-        if (panelName === "plan" && config.panels.plan.enabled) {
-          const planVisual = visualStates.plan || DEFAULT_VISUAL_STATE;
-          return (
-            <Box key={`panel-plan-${index}`} marginTop={isFirst ? 0 : 1}>
-              <PlanPanel
-                plan={planData.plan}
-                decisions={planData.decisions}
-                error={planData.error}
-                countdown={mode === "watch" ? countdowns.plan : null}
-                width={config.width}
-                justRefreshed={planVisual.justRefreshed}
               />
             </Box>
           );

@@ -5,7 +5,7 @@ import {
   statSync as nodeStatSync,
 } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { join, basename } from "path";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -36,11 +36,17 @@ export function resetFsMock(): void {
 
 export type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
 
+export interface ActivityEntry {
+  timestamp: Date;
+  type: "tool" | "response" | "user";
+  icon: string;
+  label: string;
+  detail: string;
+}
+
 export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
-  lastUserMessage: string | null;
-  currentAction: string | null;
-  lastTimestamp: Date | null;
+  activities: ActivityEntry[];
   tokenCount: number;
 }
 
@@ -63,7 +69,7 @@ interface JsonlAssistantEntry {
       type: string;
       text?: string;
       name?: string;
-      input?: { command?: string; file_path?: string };
+      input?: { command?: string; file_path?: string; pattern?: string; query?: string };
     }>;
   };
   usage?: { output_tokens: number };
@@ -80,9 +86,24 @@ type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { ty
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_SECONDS_MS = 30 * 1000;
-const MAX_LINES_FOR_STATUS = 50;
-const MAX_LINES_FOR_USER_MESSAGE = 500; // Scan more lines to find user message
-const MAX_ACTION_LENGTH = 50;
+const MAX_LINES_TO_SCAN = 200;
+const MAX_ACTIVITIES = 10;
+const MAX_DETAIL_LENGTH = 45;
+
+// Tool icons mapping
+const TOOL_ICONS: Record<string, string> = {
+  Edit: "✏️",
+  Write: "✏️",
+  Read: "📖",
+  Bash: "🔧",
+  Glob: "🔍",
+  Grep: "🔍",
+  WebFetch: "🌐",
+  WebSearch: "🌐",
+  Task: "📋",
+  TodoWrite: "📝",
+  AskUserQuestion: "❓",
+};
 
 /**
  * Convert project path to Claude session directory path
@@ -135,15 +156,32 @@ function truncate(str: string, maxLen: number): string {
   return str.slice(0, maxLen - 3) + "...";
 }
 
+function getToolDetail(toolName: string, input?: { command?: string; file_path?: string; pattern?: string; query?: string }): string {
+  if (!input) return "";
+
+  if (input.command) {
+    return truncate(input.command, MAX_DETAIL_LENGTH);
+  }
+  if (input.file_path) {
+    // Show just the filename
+    return basename(input.file_path);
+  }
+  if (input.pattern) {
+    return truncate(input.pattern, MAX_DETAIL_LENGTH);
+  }
+  if (input.query) {
+    return truncate(input.query, MAX_DETAIL_LENGTH);
+  }
+  return "";
+}
+
 /**
  * Parse session state from a JSONL session file
  */
 export function parseSessionState(sessionFile: string): ClaudeSessionState {
   const defaultState: ClaudeSessionState = {
     status: "none",
-    lastUserMessage: null,
-    currentAction: null,
-    lastTimestamp: null,
+    activities: [],
     tokenCount: 0,
   };
 
@@ -163,41 +201,14 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
     return defaultState;
   }
 
-  let lastUserMessage: string | null = null;
-  let currentAction: string | null = null;
-  let lastTimestamp: Date | null = null;
+  const activities: ActivityEntry[] = [];
   let tokenCount = 0;
+  let lastTimestamp: Date | null = null;
   let lastType: "user" | "tool" | "response" | "stop" | null = null;
 
-  // First pass: scan backwards to find the most recent user message (up to 500 lines)
-  const linesForUserMessage = lines.slice(-MAX_LINES_FOR_USER_MESSAGE);
-  for (let i = linesForUserMessage.length - 1; i >= 0; i--) {
-    try {
-      const entry = JSON.parse(linesForUserMessage[i]) as JsonlEntry;
-      if (entry.type === "user") {
-        const userEntry = entry as JsonlUserEntry;
-        const msgContent = userEntry.message?.content;
-        if (typeof msgContent === "string") {
-          lastUserMessage = msgContent;
-          break;
-        } else if (Array.isArray(msgContent)) {
-          const textBlock = msgContent.find(
-            (c): c is { type: "text"; text: string } =>
-              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
-          );
-          if (textBlock) {
-            lastUserMessage = textBlock.text;
-            break;
-          }
-        }
-      }
-    } catch {
-      // Skip invalid JSON
-    }
-  }
+  // Parse recent lines (up to MAX_LINES_TO_SCAN)
+  const recentLines = lines.slice(-MAX_LINES_TO_SCAN);
 
-  // Second pass: parse recent lines for status, action, tokens (50 lines for performance)
-  const recentLines = lines.slice(-MAX_LINES_FOR_STATUS);
   for (const line of recentLines) {
     try {
       const entry = JSON.parse(line) as JsonlEntry;
@@ -207,6 +218,32 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
         if (userEntry.timestamp) {
           lastTimestamp = new Date(userEntry.timestamp);
         }
+
+        // Extract user message text
+        const msgContent = userEntry.message?.content;
+        let userText = "";
+        if (typeof msgContent === "string") {
+          userText = msgContent;
+        } else if (Array.isArray(msgContent)) {
+          const textBlock = msgContent.find(
+            (c): c is { type: "text"; text: string } =>
+              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
+          );
+          if (textBlock) {
+            userText = textBlock.text;
+          }
+        }
+
+        // Only add if there's actual user text (not just tool results)
+        if (userText) {
+          activities.push({
+            timestamp: lastTimestamp || new Date(),
+            type: "user",
+            icon: "👤",
+            label: "User",
+            detail: truncate(userText.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
+          });
+        }
         lastType = "user";
       }
 
@@ -215,19 +252,36 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
         if (assistantEntry.timestamp) {
           lastTimestamp = new Date(assistantEntry.timestamp);
         }
-        const messageContent = assistantEntry.message?.content;
 
+        const messageContent = assistantEntry.message?.content;
         if (Array.isArray(messageContent)) {
-          // Check for tool_use
-          const toolUse = messageContent.find((c) => c.type === "tool_use");
-          if (toolUse) {
-            const toolInput =
-              toolUse.input?.command || toolUse.input?.file_path || "";
-            currentAction = `${toolUse.name}: ${truncate(toolInput, MAX_ACTION_LENGTH)}`;
-            lastType = "tool";
-          } else {
-            currentAction = null;
-            lastType = "response";
+          for (const block of messageContent) {
+            if (block.type === "tool_use") {
+              const toolName = block.name || "Tool";
+              const icon = TOOL_ICONS[toolName] || "🔧";
+              const detail = getToolDetail(toolName, block.input);
+
+              activities.push({
+                timestamp: lastTimestamp || new Date(),
+                type: "tool",
+                icon,
+                label: toolName,
+                detail,
+              });
+              lastType = "tool";
+            } else if (block.type === "text" && block.text) {
+              // Only add text response if it's substantial
+              if (block.text.length > 10) {
+                activities.push({
+                  timestamp: lastTimestamp || new Date(),
+                  type: "response",
+                  icon: "🤖",
+                  label: "Response",
+                  detail: truncate(block.text.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
+                });
+                lastType = "response";
+              }
+            }
           }
         }
 
@@ -271,11 +325,10 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
     }
   }
 
+  // Return activities in reverse order (most recent first), limited to MAX_ACTIVITIES
   return {
     status,
-    lastUserMessage,
-    currentAction,
-    lastTimestamp,
+    activities: activities.slice(-MAX_ACTIVITIES).reverse(),
     tokenCount,
   };
 }
@@ -286,9 +339,7 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
 export function getClaudeData(projectPath: string): ClaudeData {
   const defaultState: ClaudeSessionState = {
     status: "none",
-    lastUserMessage: null,
-    currentAction: null,
-    lastTimestamp: null,
+    activities: [],
     tokenCount: 0,
   };
 

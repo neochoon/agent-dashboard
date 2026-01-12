@@ -9,10 +9,6 @@ import {
   type FsMock as ConfigFsMock,
 } from "../src/config/parser.js";
 import {
-  setReadFileFn as setPlanReadFileFn,
-  resetReadFileFn as resetPlanReadFileFn,
-} from "../src/data/plan.js";
-import {
   setReadFileFn as setTestsReadFileFn,
   resetReadFileFn as resetTestsReadFileFn,
 } from "../src/data/tests.js";
@@ -46,11 +42,6 @@ describe("App with config", () => {
     };
     setConfigFsMock(configFsMock);
 
-    // Plan read mock - throw to simulate missing file
-    setPlanReadFileFn(() => {
-      throw new Error("File not found");
-    });
-
     // Tests read mock - throw to simulate missing file
     setTestsReadFileFn(() => {
       throw new Error("File not found");
@@ -69,7 +60,6 @@ describe("App with config", () => {
   afterEach(() => {
     resetExecFn();
     resetConfigFsMock();
-    resetPlanReadFileFn();
     resetTestsReadFileFn();
     resetClaudeFsMock();
   });
@@ -79,7 +69,6 @@ describe("App with config", () => {
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).toContain("Git");
-      expect(lastFrame()).toContain("Plan");
       expect(lastFrame()).toContain("Tests");
     });
 
@@ -94,22 +83,6 @@ panels:
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).not.toContain("─ Git");
-      expect(lastFrame()).toContain("Plan");
-      expect(lastFrame()).toContain("Tests");
-    });
-
-    it("hides plan panel when disabled", () => {
-      configFsMock.existsSync.mockReturnValue(true);
-      configFsMock.readFileSync.mockReturnValue(`
-panels:
-  plan:
-    enabled: false
-`);
-
-      const { lastFrame } = render(<App mode="once" />);
-
-      expect(lastFrame()).toContain("Git");
-      expect(lastFrame()).not.toContain("─ Plan");
       expect(lastFrame()).toContain("Tests");
     });
 
@@ -124,7 +97,6 @@ panels:
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).toContain("Git");
-      expect(lastFrame()).toContain("Plan");
       expect(lastFrame()).not.toContain("─ Tests");
     });
 
@@ -134,8 +106,6 @@ panels:
 panels:
   git:
     enabled: false
-  plan:
-    enabled: false
   tests:
     enabled: false
 `);
@@ -143,7 +113,6 @@ panels:
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).not.toContain("─ Git");
-      expect(lastFrame()).not.toContain("─ Plan");
       expect(lastFrame()).not.toContain("─ Tests");
     });
   });
@@ -172,8 +141,6 @@ panels:
 panels:
   git:
     enabled: true
-  plan:
-    enabled: true
   docker:
     enabled: true
     command: echo "nginx"
@@ -186,12 +153,10 @@ panels:
 
       // Verify order by checking positions
       const gitPos = output.indexOf("─ Git");
-      const planPos = output.indexOf("─ Plan");
       const dockerPos = output.indexOf("─ Docker");
       const testsPos = output.indexOf("─ Tests");
 
-      expect(gitPos).toBeLessThan(planPos);
-      expect(planPos).toBeLessThan(dockerPos);
+      expect(gitPos).toBeLessThan(dockerPos);
       expect(dockerPos).toBeLessThan(testsPos);
     });
 
@@ -204,8 +169,6 @@ panels:
   docker:
     enabled: true
     command: echo "nginx"
-  plan:
-    enabled: true
   tests:
     enabled: true
 `);
@@ -213,15 +176,13 @@ panels:
       const { lastFrame } = render(<App mode="once" />);
       const output = lastFrame() || "";
 
-      // Order: git -> docker -> plan -> tests
+      // Order: git -> docker -> tests
       const gitPos = output.indexOf("─ Git");
       const dockerPos = output.indexOf("─ Docker");
-      const planPos = output.indexOf("─ Plan");
       const testsPos = output.indexOf("─ Tests");
 
       expect(gitPos).toBeLessThan(dockerPos);
-      expect(dockerPos).toBeLessThan(planPos);
-      expect(planPos).toBeLessThan(testsPos);
+      expect(dockerPos).toBeLessThan(testsPos);
     });
   });
 });

@@ -117,11 +117,10 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.status).toBe("none");
-      expect(result.lastUserMessage).toBeNull();
-      expect(result.currentAction).toBeNull();
+      expect(result.activities).toEqual([]);
     });
 
-    it("parses user message from jsonl", () => {
+    it("parses user message into activity", () => {
       const jsonl = JSON.stringify({
         type: "user",
         message: { role: "user", content: "Show me the project structure" },
@@ -133,7 +132,10 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.lastUserMessage).toBe("Show me the project structure");
+      expect(result.activities.length).toBe(1);
+      expect(result.activities[0].type).toBe("user");
+      expect(result.activities[0].label).toBe("User");
+      expect(result.activities[0].detail).toContain("Show me the project");
     });
 
     it("parses user message from array content with text block", () => {
@@ -154,7 +156,8 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.lastUserMessage).toBe("Now fix the bug");
+      expect(result.activities.length).toBe(1);
+      expect(result.activities[0].detail).toContain("Now fix the bug");
     });
 
     it("skips user message when array content has only tool_result", () => {
@@ -182,8 +185,9 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      // Should keep the previous string message since array has no text
-      expect(result.lastUserMessage).toBe("Initial message");
+      // Should only have the first message since second has no text
+      expect(result.activities.length).toBe(1);
+      expect(result.activities[0].detail).toContain("Initial message");
     });
 
     it("detects running status for tool_use within 30 seconds", () => {
@@ -215,8 +219,9 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.status).toBe("running");
-      expect(result.currentAction).toContain("Bash");
-      expect(result.currentAction).toContain("npm run build");
+      // Most recent activity should be the Bash tool
+      expect(result.activities[0].label).toBe("Bash");
+      expect(result.activities[0].detail).toContain("npm run build");
     });
 
     it("detects completed status for text response within 30 seconds", () => {
@@ -230,7 +235,7 @@ describe("claude data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [{ type: "text", text: "This code does..." }],
+            content: [{ type: "text", text: "This code does something very important and interesting." }],
           },
           usage: { output_tokens: 150 },
           timestamp: now.toISOString(),
@@ -243,7 +248,6 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.status).toBe("completed");
-      expect(result.currentAction).toBeNull();
       expect(result.tokenCount).toBe(150);
     });
 
@@ -257,7 +261,7 @@ describe("claude data module", () => {
         }),
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Done" }] },
+          message: { content: [{ type: "text", text: "Done with the task successfully" }] },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
         }),
         JSON.stringify({
@@ -298,13 +302,13 @@ describe("claude data module", () => {
       const lines = [
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "First" }] },
+          message: { content: [{ type: "text", text: "First response with some content" }] },
           usage: { output_tokens: 100 },
           timestamp: new Date(now.getTime() - 3000).toISOString(),
         }),
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Second" }] },
+          message: { content: [{ type: "text", text: "Second response with more content" }] },
           usage: { output_tokens: 200 },
           timestamp: now.toISOString(),
         }),
@@ -341,23 +345,36 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.currentAction).toContain("Read");
-      expect(result.currentAction).toContain("/Users/test/src/index.ts");
+      expect(result.activities[0].label).toBe("Read");
+      expect(result.activities[0].detail).toBe("index.ts");
     });
 
-    it("truncates long tool inputs", () => {
+    it("uses correct icons for different tools", () => {
       const now = new Date();
-      const longCommand = "a".repeat(100);
       const lines = [
         JSON.stringify({
           type: "assistant",
           message: {
             content: [
-              {
-                type: "tool_use",
-                name: "Bash",
-                input: { command: longCommand },
-              },
+              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 3000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 2000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Grep", input: { pattern: "function" } },
             ],
           },
           timestamp: now.toISOString(),
@@ -369,8 +386,10 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.currentAction!.length).toBeLessThan(100);
-      expect(result.currentAction).toContain("...");
+      // Activities are in reverse order (most recent first)
+      expect(result.activities[0].icon).toBe("🔍"); // Grep
+      expect(result.activities[1].icon).toBe("🔧"); // Bash
+      expect(result.activities[2].icon).toBe("✏️"); // Edit
     });
 
     it("handles empty file gracefully", () => {
@@ -380,6 +399,7 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.status).toBe("none");
+      expect(result.activities).toEqual([]);
     });
 
     it("skips invalid JSON lines", () => {
@@ -399,20 +419,25 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.lastUserMessage).toBe("Valid message");
+      expect(result.activities.length).toBe(1);
+      expect(result.activities[0].detail).toContain("Valid message");
     });
 
-    it("only parses last 50 lines for performance", () => {
+    it("limits activities to 10 most recent", () => {
       const now = new Date();
       const lines: string[] = [];
 
-      // Add 100 lines with user messages
-      for (let i = 0; i < 100; i++) {
+      // Add 20 tool uses
+      for (let i = 0; i < 20; i++) {
         lines.push(
           JSON.stringify({
-            type: "user",
-            message: { role: "user", content: `Message ${i}` },
-            timestamp: new Date(now.getTime() - (100 - i) * 1000).toISOString(),
+            type: "assistant",
+            message: {
+              content: [
+                { type: "tool_use", name: "Read", input: { file_path: `/file${i}.ts` } },
+              ],
+            },
+            timestamp: new Date(now.getTime() - (20 - i) * 1000).toISOString(),
           })
         );
       }
@@ -422,8 +447,10 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      // Should get the last message from the last 50 lines
-      expect(result.lastUserMessage).toBe("Message 99");
+      // Should only have 10 activities
+      expect(result.activities.length).toBe(10);
+      // Most recent should be first
+      expect(result.activities[0].detail).toBe("file19.ts");
     });
   });
 
@@ -454,7 +481,8 @@ describe("claude data module", () => {
 
       const result = getClaudeData("/Users/test/project");
 
-      expect(result.state.lastUserMessage).toBe("Test message");
+      expect(result.state.activities.length).toBe(1);
+      expect(result.state.activities[0].detail).toContain("Test message");
       expect(result.timestamp).toBeDefined();
     });
 

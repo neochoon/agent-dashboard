@@ -73,11 +73,17 @@ export type GenericPanelRenderer = "list" | "progress" | "status";
 // Claude session types
 export type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
 
+export interface ActivityEntry {
+  timestamp: Date;
+  type: "tool" | "response" | "user";
+  icon: string;
+  label: string;
+  detail: string;
+}
+
 export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
-  lastUserMessage: string | null;
-  currentAction: string | null;
-  lastTimestamp: Date | null;
+  activities: ActivityEntry[];
   tokenCount: number;
 }
 
