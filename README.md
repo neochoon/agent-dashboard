@@ -93,7 +93,7 @@ Shows today's git activity and current state:
 
 ```
 ┌─ Git ────────────────────────────────────────────────┐
-│ feat/add-dashboard · +142 -23 · 3 commits · 5 files │
+│ feat/add-dashboard · +142 -23 · 3 commits · 5 files  │
 │ • abc1234 Add dashboard component                    │
 │ • def5678 Fix styling issues                         │
 └──────────────────────────────────────────────────────┘
@@ -109,9 +109,9 @@ Shows test results with staleness detection:
 
 ```
 ┌─ Tests ──────────────────────────────────────────────┐
-│ ✓ 42 passed  ✗ 1 failed  ○ 2 skipped · abc1234      │
+│ ✓ 42 passed  ✗ 1 failed  ○ 2 skipped · abc1234       │
 │ ⚠ Outdated (3 commits behind)                        │
-│────────────────────────────────────────────────────│
+│──────────────────────────────────────────────────────│
 │ ✗ Button.test.tsx                                    │
 │   • should render correctly                          │
 └──────────────────────────────────────────────────────┘
