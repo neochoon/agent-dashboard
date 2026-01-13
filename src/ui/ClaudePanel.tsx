@@ -55,6 +55,22 @@ function formatCountdown(seconds: number | null | undefined): string {
   return `↻ ${padded}s`;
 }
 
+function formatElapsedTime(startTime: Date | null): string {
+  if (!startTime) return "";
+  const elapsed = Date.now() - startTime.getTime();
+  const minutes = Math.floor(elapsed / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m`;
+  }
+  return "<1m";
+}
+
 function getStatusIcon(status: ClaudeSessionStatus): string {
   switch (status) {
     case "running":
@@ -144,9 +160,14 @@ export function ClaudePanel({
 
   const { state } = data;
   const statusIcon = getStatusIcon(state.status);
+  const elapsedTime = formatElapsedTime(state.sessionStartTime);
 
-  // Build title suffix (countdown only, like other panels)
-  const titleSuffix = countdownSuffix;
+  // Build title suffix with elapsed time and countdown
+  const titleSuffix = elapsedTime
+    ? countdownSuffix
+      ? `${elapsedTime} · ${countdownSuffix}`
+      : elapsedTime
+    : countdownSuffix;
 
   // Error state
   if (data.error) {

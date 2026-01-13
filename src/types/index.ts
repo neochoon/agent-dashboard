@@ -106,6 +106,7 @@ export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
   activities: ActivityEntry[];
   tokenCount: number;
+  sessionStartTime: Date | null;
 }
 
 export interface ClaudeData {

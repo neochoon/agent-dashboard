@@ -49,6 +49,7 @@ export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
   activities: ActivityEntry[];
   tokenCount: number;
+  sessionStartTime: Date | null;
 }
 
 export interface ClaudeData {
@@ -161,6 +162,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     status: "none",
     activities: [],
     tokenCount: 0,
+    sessionStartTime: null,
   };
 
   if (!fs.existsSync(sessionFile)) {
@@ -177,6 +179,20 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
   const lines = content.trim().split("\n").filter(Boolean);
   if (lines.length === 0) {
     return defaultState;
+  }
+
+  // Extract session start time from first few lines
+  let sessionStartTime: Date | null = null;
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    try {
+      const entry = JSON.parse(lines[i]);
+      if (entry.timestamp) {
+        sessionStartTime = new Date(entry.timestamp);
+        break;
+      }
+    } catch {
+      // Skip invalid JSON lines
+    }
   }
 
   const activities: ActivityEntry[] = [];
@@ -308,6 +324,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     status,
     activities: activities.slice(-maxActivities).reverse(),
     tokenCount,
+    sessionStartTime,
   };
 }
 
@@ -319,6 +336,7 @@ export function getClaudeData(projectPath: string, maxActivities?: number): Clau
     status: "none",
     activities: [],
     tokenCount: 0,
+    sessionStartTime: null,
   };
 
   try {

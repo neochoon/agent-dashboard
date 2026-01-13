@@ -43,6 +43,7 @@ describe("ClaudePanel", () => {
       status: "running",
       activities: mockActivities,
       tokenCount: 1500,
+      sessionStartTime: null,
     },
     hasSession: true,
     timestamp: "2025-01-12T10:30:00Z",
@@ -57,6 +58,7 @@ describe("ClaudePanel", () => {
           status: "none",
           activities: [],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -74,6 +76,7 @@ describe("ClaudePanel", () => {
           status: "none",
           activities: [],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -89,6 +92,7 @@ describe("ClaudePanel", () => {
           status: "running",
           activities: [],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -159,6 +163,7 @@ describe("ClaudePanel", () => {
           status: "running",
           activities: mockActivities,
           tokenCount: 12500,
+          sessionStartTime: null,
         },
       });
 
@@ -173,12 +178,103 @@ describe("ClaudePanel", () => {
           status: "running",
           activities: mockActivities,
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
       expect(lastFrame()).not.toContain("tokens");
+    });
+  });
+
+  describe("elapsed time", () => {
+    it("shows elapsed time in hours and minutes in title", () => {
+      // 2 hours 30 minutes ago
+      const sessionStart = new Date(Date.now() - 2 * 60 * 60 * 1000 - 30 * 60 * 1000);
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain("2h 30m");
+    });
+
+    it("shows elapsed time in minutes only when less than 1 hour", () => {
+      // 45 minutes ago
+      const sessionStart = new Date(Date.now() - 45 * 60 * 1000);
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain("45m");
+      expect(lastFrame()).not.toContain("h ");
+    });
+
+    it("shows '<1m' when less than 1 minute", () => {
+      // 30 seconds ago
+      const sessionStart = new Date(Date.now() - 30 * 1000);
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain("<1m");
+    });
+
+    it("shows elapsed time with countdown separated by dot", () => {
+      // 10 minutes ago
+      const sessionStart = new Date(Date.now() - 10 * 60 * 1000);
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} countdown={15} />);
+
+      // Should show both elapsed time and countdown with separator
+      expect(lastFrame()).toContain("10m");
+      expect(lastFrame()).toContain("·");
+      expect(lastFrame()).toContain("15s");
+    });
+
+    it("shows only countdown when sessionStartTime is null", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} countdown={20} />);
+
+      expect(lastFrame()).toContain("20s");
+      expect(lastFrame()).not.toContain("·");
     });
   });
 
@@ -241,6 +337,7 @@ describe("ClaudePanel", () => {
             },
           ],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -434,6 +531,7 @@ describe("ClaudePanel", () => {
             },
           ],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -465,7 +563,7 @@ describe("ClaudePanel", () => {
       ];
 
       const data = createMockData({
-        state: { status: "running", activities, tokenCount: 0 },
+        state: { status: "running", activities, tokenCount: 0, sessionStartTime: null },
       });
 
       const { lastFrame } = render(<ClaudePanel data={data} width={100} />);
@@ -499,6 +597,7 @@ describe("ClaudePanel", () => {
             },
           ],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -527,6 +626,7 @@ describe("ClaudePanel", () => {
             },
           ],
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 
@@ -581,6 +681,7 @@ describe("ClaudePanel", () => {
           status: "running",
           activities: mixedActivities,
           tokenCount: 0,
+          sessionStartTime: null,
         },
       });
 

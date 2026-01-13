@@ -488,6 +488,53 @@ describe("claude data module", () => {
       // Most recent should be first
       expect(result.activities[0].detail).toBe("file19.ts");
     });
+
+    it("extracts sessionStartTime from first entry with timestamp", () => {
+      const sessionStart = new Date("2024-01-15T10:30:00Z");
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "First message" },
+          timestamp: sessionStart.toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "text", text: "Response to the first message" }] },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.sessionStartTime).not.toBeNull();
+      expect(result.sessionStartTime?.toISOString()).toBe(sessionStart.toISOString());
+    });
+
+    it("returns null sessionStartTime when no entries have timestamps", () => {
+      const lines = [
+        JSON.stringify({ type: "system", subtype: "init" }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.sessionStartTime).toBeNull();
+    });
+
+    it("returns null sessionStartTime for empty file", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue("");
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.sessionStartTime).toBeNull();
+    });
   });
 
   describe("getClaudeData", () => {
