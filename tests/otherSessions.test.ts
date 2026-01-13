@@ -493,5 +493,39 @@ describe("otherSessions data module", () => {
 
       expect(result.projectNames).toEqual([]);
     });
+
+    it("deduplicates project names with same basename", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path.endsWith("projects")) {
+          // Two different paths with same basename "dotfiles"
+          return ["-Users-alice-dotfiles", "-Users-bob-dotfiles", "-Users-test-other"];
+        }
+        return ["session.jsonl"];
+      });
+      mockFs.statSync.mockImplementation((path: string) => {
+        if (path.endsWith(".jsonl")) {
+          if (path.includes("alice")) {
+            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false };
+          }
+          if (path.includes("bob")) {
+            return { mtimeMs: Date.now() - 2 * 60 * 1000, isDirectory: () => false };
+          }
+          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false };
+        }
+        return { isDirectory: () => true };
+      });
+      mockFs.readFileSync.mockReturnValue(
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "text", text: "Hello" }] },
+        })
+      );
+
+      const result = getOtherSessionsData("/other/path");
+
+      // Should only have unique names, "dotfiles" appears once
+      expect(result.projectNames).toEqual(["dotfiles", "other"]);
+    });
   });
 });

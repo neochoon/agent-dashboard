@@ -335,8 +335,15 @@ export function getOtherSessionsData(
 
   otherSessions.sort((a, b) => b.mtimeMs - a.mtimeMs);
 
-  // Extract project names sorted by most recent
-  defaultResult.projectNames = otherSessions.map((s) => s.projectName);
+  // Extract unique project names sorted by most recent
+  const seen = new Set<string>();
+  defaultResult.projectNames = otherSessions
+    .map((s) => s.projectName)
+    .filter((name) => {
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    });
 
   const mostRecent = otherSessions[0];
 
