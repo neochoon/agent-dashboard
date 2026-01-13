@@ -26,6 +26,7 @@ Run this in a separate terminal while using Claude Code.
 - **Track your git state** - Commits, branches, uncommitted changes at a glance
 - **Know if tests pass** - Results update automatically, shows if outdated
 - **Stay oriented** - Project info, dependencies, file counts
+- **Monitor other sessions** - See what's happening in your other Claude Code projects
 
 ## Usage
 
@@ -61,7 +62,27 @@ panels:
   project:
     enabled: true
     interval: 60s
+  other_sessions:
+    enabled: true
+    interval: 10s
 ```
+
+### Other Sessions Panel
+
+Shows activity from your other Claude Code projects:
+
+```
+┌─ Other Sessions ─────────────────────────────────────┐
+│ 📁 dotfiles, pain-radar, myapp +4 | ⚡ 1 active     │
+│                                                      │
+│ 🔵 dotfiles (2m ago)                                │
+│    "Updated the config file as requested..."        │
+└──────────────────────────────────────────────────────┘
+```
+
+- **Project names**: Shows up to 3 recent projects, +N for more
+- **Active indicator**: 🔵 active (within 5 min), ⚪ inactive
+- **Last message**: Most recent assistant response from that session
 
 ## Keyboard
 
