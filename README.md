@@ -1,66 +1,57 @@
 # agenthud
 
-Terminal dashboard for AI agent development.
+When working with AI coding agents like Claude Code, you lose visibility into what's happening. The agent reads files, runs commands, makes changes - but you're staring at a single terminal, waiting.
 
-![output](./output960.gif)
+**agenthud** gives you a live dashboard in a separate terminal. See exactly what Claude is doing, track git changes, monitor test results - all updating in real-time.
+
+![demo](./output960.gif)
 
 ## Install
+
 ```bash
 npx agenthud
 ```
 
-## CLI
+Run this in a separate terminal while using Claude Code.
+
+## Why?
+
+- **See what the agent is doing** - Watch file reads, edits, bash commands as they happen
+- **Track your git state** - Commits, branches, uncommitted changes at a glance
+- **Know if tests pass** - Results update automatically, shows if outdated
+- **Stay oriented** - Project info, dependencies, file counts
+
+## Usage
 
 ```
-Usage: agenthud [command] [options]
+agenthud [command] [options]
 
 Commands:
-  init              Initialize agenthud in current directory
+  init              Create config file in current directory
 
 Options:
   -w, --watch       Watch mode (default)
   --once            Run once and exit
-  -V, --version     Show version number
-  -h, --help        Show this help message
+  -V, --version     Show version
+  -h, --help        Show help
 ```
-
-## Features
-
-- **Claude**: Real-time Claude Code session monitoring
-- **Git**: Branch, commits, line changes
-- **Tests**: Results with outdated detection
-- **Project**: Package info, stack detection
-
-## Claude Panel Icons
-
-| Symbol | Type |
-|--------|------|
-| `>` | User input |
-| `<` | Response |
-| `~` | Edit/Write |
-| `○` | Read |
-| `$` | Bash |
-| `*` | Glob/Grep |
-| `@` | Web |
-| `▶` | Task |
-| `?` | Question |
 
 ## Configuration
 
-Create `.agenthud.yaml` in your project root:
+Optional. Create `.agenthud.yaml` to customize:
 
 ```yaml
 panels:
-  git:
-    enabled: true
-    interval: 30s
   claude:
     enabled: true
     interval: 5s
     max_activities: 20
+  git:
+    enabled: true
+    interval: 30s
   tests:
     enabled: true
-    interval: manual
+    interval: manual  # press 't' to run
   project:
     enabled: true
     interval: 60s
@@ -68,8 +59,9 @@ panels:
 
 ## Keyboard
 
-- `q` - quit
-- `r` - refresh
+- `q` quit
+- `r` refresh all
+- `t` run tests (when manual)
 
 ## License
 
