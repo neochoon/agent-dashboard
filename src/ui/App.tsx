@@ -151,20 +151,35 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   // Parse config once at startup
   const { config, warnings } = useMemo(() => parseConfig(), []);
 
-  // Responsive terminal width using Ink's useStdout hook
-  const [width, setWidth] = useState(() => getClampedWidth(stdout?.columns));
-
-  useEffect(() => {
-    // Update width when stdout columns change
-    const newWidth = getClampedWidth(stdout?.columns);
-    if (newWidth !== width) {
-      setWidth(newWidth);
+  // Width priority: config.width > terminal width (clamped)
+  const getEffectiveWidth = (terminalColumns: number | undefined): number => {
+    // If config specifies width, use it (already validated in parser)
+    if (config.width) {
+      return config.width;
     }
-  }, [stdout?.columns, width]);
+    // Otherwise use terminal width with clamping
+    return getClampedWidth(terminalColumns);
+  };
+
+  // Responsive terminal width using Ink's useStdout hook
+  const [width, setWidth] = useState(() => getEffectiveWidth(stdout?.columns));
 
   useEffect(() => {
+    // Update width when stdout columns change (only if not using config width)
+    if (!config.width) {
+      const newWidth = getEffectiveWidth(stdout?.columns);
+      if (newWidth !== width) {
+        setWidth(newWidth);
+      }
+    }
+  }, [stdout?.columns, width, config.width]);
+
+  useEffect(() => {
+    // Only listen for resize if not using fixed config width
+    if (config.width) return;
+
     const handleResize = () => {
-      setWidth(getClampedWidth(stdout?.columns));
+      setWidth(getEffectiveWidth(stdout?.columns));
     };
 
     // Listen for terminal resize events
@@ -173,7 +188,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return () => {
       stdout?.off("resize", handleResize);
     };
-  }, [stdout]);
+  }, [stdout, config.width]);
 
   // Calculate interval in seconds for display
   const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;

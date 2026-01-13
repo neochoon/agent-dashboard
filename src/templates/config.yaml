@@ -1,4 +1,7 @@
 # agenthud configuration
+
+width: 80  # 50~120 사이
+
 panels:
   claude:
     enabled: true
