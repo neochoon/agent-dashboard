@@ -121,6 +121,14 @@ function formatRelativeTime(timestamp: string): string {
 }
 
 function WelcomeApp(): React.ReactElement {
+  const { exit } = useApp();
+
+  useInput((input) => {
+    if (input === "q") {
+      exit();
+    }
+  });
+
   return <WelcomePanel />;
 }
 
