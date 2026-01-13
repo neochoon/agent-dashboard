@@ -54,6 +54,7 @@ export interface SessionInfo {
 export interface OtherSessionsData {
   totalProjects: number;
   activeCount: number;
+  projectNames: string[];
   recentSession: SessionInfo | null;
   timestamp: string;
 }
@@ -222,6 +223,7 @@ export function getOtherSessionsData(
   const defaultResult: OtherSessionsData = {
     totalProjects: 0,
     activeCount: 0,
+    projectNames: [],
     recentSession: null,
     timestamp: new Date().toISOString(),
   };
@@ -281,6 +283,10 @@ export function getOtherSessionsData(
   }
 
   otherSessions.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  // Extract project names sorted by most recent
+  defaultResult.projectNames = otherSessions.map((s) => s.projectName);
+
   const mostRecent = otherSessions[0];
 
   const lastMessage = parseLastAssistantMessage(mostRecent.sessionFile);

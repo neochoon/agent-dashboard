@@ -45,6 +45,60 @@ function truncateMessage(message: string, maxLength: number): string {
   return truncated;
 }
 
+function formatProjectNames(
+  projectNames: string[],
+  maxWidth: number
+): string {
+  if (projectNames.length === 0) {
+    return "No projects";
+  }
+
+  const MAX_NAMES_TO_SHOW = 3;
+  const remaining = projectNames.length - MAX_NAMES_TO_SHOW;
+
+  // Start with up to 3 names
+  let namesToShow = projectNames.slice(0, MAX_NAMES_TO_SHOW);
+  let suffix = remaining > 0 ? ` +${remaining}` : "";
+
+  // Try to fit names within available width
+  // Available width = maxWidth - emoji(2) - space(1)
+  const emojiWidth = getDisplayWidth("📁");
+  const availableWidth = maxWidth - emojiWidth - 1;
+
+  // Build the text and truncate if needed
+  let text = namesToShow.join(", ") + suffix;
+
+  // If it fits, return as is
+  if (text.length <= availableWidth) {
+    return text;
+  }
+
+  // Try with fewer names
+  for (let count = MAX_NAMES_TO_SHOW - 1; count >= 1; count--) {
+    namesToShow = projectNames.slice(0, count);
+    const newRemaining = projectNames.length - count;
+    suffix = newRemaining > 0 ? ` +${newRemaining}` : "";
+    text = namesToShow.join(", ") + suffix;
+
+    if (text.length <= availableWidth) {
+      return text;
+    }
+  }
+
+  // If even 1 name doesn't fit, truncate it
+  const firstProject = projectNames[0];
+  const remainingCount = projectNames.length - 1;
+  suffix = remainingCount > 0 ? ` +${remainingCount}` : "";
+  const suffixLen = suffix.length;
+  const maxNameLen = availableWidth - suffixLen - 3; // -3 for "..."
+
+  if (maxNameLen > 0) {
+    return firstProject.slice(0, maxNameLen) + "..." + suffix;
+  }
+
+  return "...";
+}
+
 export function OtherSessionsPanel({
   data,
   countdown,
@@ -56,11 +110,14 @@ export function OtherSessionsPanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // Account for " " after │
 
-  const { totalProjects, activeCount, recentSession } = data;
+  const { activeCount, projectNames, recentSession } = data;
 
   // Build header line content
-  const projectWord = totalProjects === 1 ? "project" : "projects";
-  const headerText = `📁 ${totalProjects} ${projectWord} | ⚡ ${activeCount} active`;
+  // Format: 📁 radar, backend, frontend +3 | ⚡ 2 active
+  const activeSuffix = ` | ⚡ ${activeCount} active`;
+  const projectsAvailableWidth = contentWidth - getDisplayWidth(activeSuffix);
+  const projectsText = formatProjectNames(projectNames, projectsAvailableWidth);
+  const headerText = `📁 ${projectsText}${activeSuffix}`;
   const headerPadding = Math.max(0, contentWidth - getDisplayWidth(headerText));
 
   // Clear to end of line to prevent ghost text

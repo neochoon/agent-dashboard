@@ -409,4 +409,89 @@ describe("otherSessions data module", () => {
       expect(result2.recentSession?.isActive).toBe(false);
     });
   });
+
+  describe("projectNames", () => {
+    it("returns project names sorted by most recent first", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path.endsWith("projects")) {
+          return ["-Users-test-alpha", "-Users-test-beta", "-Users-test-gamma"];
+        }
+        return ["session.jsonl"];
+      });
+      mockFs.statSync.mockImplementation((path: string) => {
+        if (path.endsWith(".jsonl")) {
+          // gamma: most recent, alpha: oldest, beta: middle
+          if (path.includes("gamma")) {
+            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false };
+          }
+          if (path.includes("beta")) {
+            return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false };
+          }
+          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false };
+        }
+        return { isDirectory: () => true };
+      });
+      mockFs.readFileSync.mockReturnValue(
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "text", text: "Hello" }] },
+        })
+      );
+
+      const result = getOtherSessionsData("/other/path");
+
+      expect(result.projectNames).toEqual(["gamma", "beta", "alpha"]);
+    });
+
+    it("excludes current project from projectNames", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path.endsWith("projects")) {
+          return ["-Users-test-current", "-Users-test-other"];
+        }
+        return ["session.jsonl"];
+      });
+      mockFs.statSync.mockImplementation((path: string) => {
+        if (path.endsWith(".jsonl")) {
+          return { mtimeMs: Date.now() - 1000, isDirectory: () => false };
+        }
+        return { isDirectory: () => true };
+      });
+      mockFs.readFileSync.mockReturnValue(
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "text", text: "Hello" }] },
+        })
+      );
+
+      const result = getOtherSessionsData("/Users/test/current");
+
+      expect(result.projectNames).toEqual(["other"]);
+      expect(result.projectNames).not.toContain("current");
+    });
+
+    it("returns empty array when no projects exist", () => {
+      mockFs.existsSync.mockReturnValue(false);
+
+      const result = getOtherSessionsData("/current/project");
+
+      expect(result.projectNames).toEqual([]);
+    });
+
+    it("returns empty array when no other sessions have files", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path.endsWith("projects")) {
+          return ["-Users-test-emptyproject"];
+        }
+        return []; // No session files
+      });
+      mockFs.statSync.mockReturnValue({ isDirectory: () => true });
+
+      const result = getOtherSessionsData("/other/path");
+
+      expect(result.projectNames).toEqual([]);
+    });
+  });
 });
