@@ -75,17 +75,17 @@ Shows real-time Claude Code activity:
 
 ```
 ┌─ Claude ─────────────────────────────────────────────┐
-│ 📖 Read src/components/Button.tsx                    │
-│ ✏️  Edit src/components/Button.tsx                   │
-│ 🔧 Bash npm test                                     │
-│ 📖 Read src/utils/helpers.ts                         │
+│ [10:23:45] ○ Read: src/components/Button.tsx         │
+│ [10:23:46] ~ Edit: src/components/Button.tsx         │
+│ [10:23:47] $ Bash: npm test                          │
+│ [10:23:50] < Response: Tests passed successfully...  │
 └──────────────────────────────────────────────────────┘
 ```
 
-- **📖 Read**: File being read
-- **✏️ Edit**: File being modified
-- **🔧 Bash**: Command being executed
-- **✅ TodoWrite**: Task list updates
+- **○ Read**: File being read
+- **~ Edit/Write**: File being modified
+- **$ Bash**: Command being executed
+- **< Response**: Claude's text response
 
 ### Git Panel
 
@@ -93,20 +93,15 @@ Shows today's git activity and current state:
 
 ```
 ┌─ Git ────────────────────────────────────────────────┐
-│ 🌿 feat/add-dashboard                                │
-│ ────────────────────────────────────────────────────│
-│ 📊 Today: 3 commits | +142 -23 | 5 files            │
-│ 📝 2 uncommitted                                     │
-│ ────────────────────────────────────────────────────│
+│ feat/add-dashboard · +142 -23 · 3 commits · 5 files │
 │ • abc1234 Add dashboard component                    │
 │ • def5678 Fix styling issues                         │
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Branch name**: Current working branch
-- **Today stats**: Commits, lines added/deleted, files changed
-- **Uncommitted**: Number of uncommitted changes
-- **Commit list**: Today's commits with hash and message
+- **Branch name**: Current working branch (green)
+- **Stats**: Lines added/deleted, commits, files changed
+- **dirty**: Shows uncommitted change count (yellow)
 
 ### Tests Panel
 
@@ -114,17 +109,17 @@ Shows test results with staleness detection:
 
 ```
 ┌─ Tests ──────────────────────────────────────────────┐
-│ ✅ 42 passed  ❌ 1 failed  ⏭️  2 skipped             │
-│ ⚠️  Outdated (3 commits behind)                      │
-│ ────────────────────────────────────────────────────│
-│ ❌ Button.test.tsx                                   │
-│    expected true to be false                         │
+│ ✓ 42 passed  ✗ 1 failed  ○ 2 skipped · abc1234      │
+│ ⚠ Outdated (3 commits behind)                        │
+│────────────────────────────────────────────────────│
+│ ✗ Button.test.tsx                                    │
+│   • should render correctly                          │
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Test counts**: Passed, failed, skipped
-- **Staleness**: Warning if tests are behind commits
-- **Failed tests**: Shows failing test details
+- **✓ passed** (green), **✗ failed** (red), **○ skipped**
+- **⚠ Outdated**: Warning if tests are behind commits
+- **Failures**: Shows failing test file and name
 
 ### Project Panel
 
@@ -132,18 +127,17 @@ Shows project overview and structure:
 
 ```
 ┌─ Project ────────────────────────────────────────────┐
-│ 📁 agenthud                                          │
-│ 📦 0.5.16 | ⚙️  node 20.10.0 | 📜 MIT               │
-│ ────────────────────────────────────────────────────│
-│ 🏗️  12 dependencies | 🧪 8 devDependencies          │
-│ 📄 45 files | 📂 src, tests, dist                   │
+│ agenthud · TypeScript · MIT                          │
+│ Stack: react, ink, vitest                            │
+│ Files: 45 .ts · Lines: 3.2k                          │
+│ Deps: 12 prod · 8 dev                                │
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Package info**: Name, version, license
-- **Runtime**: Node.js version
-- **Dependencies**: Production and dev dependency counts
-- **Structure**: File count and main directories
+- **Name/Language/License**: Project basics
+- **Stack**: Detected frameworks and tools
+- **Files/Lines**: Source code stats
+- **Deps**: Dependency counts
 
 ### Other Sessions Panel
 
