@@ -12,7 +12,7 @@ When working with AI coding agents like Claude Code, you lose visibility into wh
 
 ## Install
 
-Requires Node.js 20+
+Requires Node.js 20+. Tested on Ubuntu, Windows, macOS.
 
 ```bash
 npx agenthud
