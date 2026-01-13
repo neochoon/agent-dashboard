@@ -73,6 +73,27 @@ export type GenericPanelRenderer = "list" | "progress" | "status";
 // Claude session types
 export type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
 
+// Centralized icon definitions for Claude panel
+export const ICONS = {
+  // Activity types
+  User: ">",
+  Response: "<",
+  // Tools
+  Edit: "~",
+  Write: "~",
+  Read: "○",
+  Bash: "$",
+  Glob: "*",
+  Grep: "*",
+  WebFetch: "@",
+  WebSearch: "@",
+  Task: "▶",
+  TodoWrite: "~",
+  AskUserQuestion: "?",
+  // Fallback
+  Default: "$",
+} as const;
+
 export interface ActivityEntry {
   timestamp: Date;
   type: "tool" | "response" | "user";

@@ -2,13 +2,14 @@ import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
 import { ClaudePanel, getActivityStyle } from "../src/ui/ClaudePanel.js";
+import { ICONS } from "../src/types/index.js";
 import type { ClaudeData, ActivityEntry } from "../src/types/index.js";
 
 describe("ClaudePanel", () => {
   const mockActivity: ActivityEntry = {
     timestamp: new Date("2025-01-12T10:30:00"),
     type: "tool",
-    icon: "🔍",
+    icon: ICONS.Grep,
     label: "Grep",
     detail: "searching for pattern",
   };
@@ -17,21 +18,21 @@ describe("ClaudePanel", () => {
     {
       timestamp: new Date("2025-01-12T10:30:00"),
       type: "user",
-      icon: "💬",
+      icon: ICONS.User,
       label: "User",
       detail: "Show me the project structure",
     },
     {
       timestamp: new Date("2025-01-12T10:30:05"),
       type: "tool",
-      icon: "🔍",
+      icon: ICONS.Glob,
       label: "Glob",
       detail: "src/**/*.ts",
     },
     {
       timestamp: new Date("2025-01-12T10:30:10"),
       type: "tool",
-      icon: "📖",
+      icon: ICONS.Read,
       label: "Read",
       detail: "package.json",
     },
@@ -145,9 +146,9 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("💬");
-      expect(lastFrame()).toContain("🔍");
-      expect(lastFrame()).toContain("📖");
+      expect(lastFrame()).toContain(ICONS.User);
+      expect(lastFrame()).toContain(ICONS.Glob);
+      expect(lastFrame()).toContain(ICONS.Read);
     });
   });
 
@@ -234,7 +235,7 @@ describe("ClaudePanel", () => {
             {
               timestamp: new Date("2025-01-12T10:30:00"),
               type: "tool",
-              icon: "🔍",
+              icon: ICONS.Grep,
               label: "Grep",
               detail: longDetail,
             },
@@ -276,7 +277,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "user",
-        icon: "💬",
+        icon: ICONS.User,
         label: "User",
         detail: "hello",
       };
@@ -291,7 +292,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "response",
-        icon: "🤖",
+        icon: ICONS.Response,
         label: "Response",
         detail: "I will help you",
       };
@@ -306,7 +307,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "🔧",
+        icon: ICONS.Bash,
         label: "Bash",
         detail: "npm run test",
       };
@@ -321,7 +322,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "📝",
+        icon: ICONS.Edit,
         label: "Edit",
         detail: "src/index.ts",
       };
@@ -335,7 +336,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "📖",
+        icon: ICONS.Read,
         label: "Read",
         detail: "package.json",
       };
@@ -349,7 +350,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "📝",
+        icon: ICONS.Write,
         label: "Write",
         detail: "config.yaml",
       };
@@ -363,7 +364,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "🔍",
+        icon: ICONS.Grep,
         label: "Grep",
         detail: "pattern",
       };
@@ -377,7 +378,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "🔍",
+        icon: ICONS.Glob,
         label: "Glob",
         detail: "**/*.ts",
       };
@@ -391,7 +392,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "📋",
+        icon: ICONS.TodoWrite,
         label: "TodoWrite",
         detail: "updating tasks",
       };
@@ -405,7 +406,7 @@ describe("ClaudePanel", () => {
       const activity: ActivityEntry = {
         timestamp: new Date(),
         type: "tool",
-        icon: "❓",
+        icon: ICONS.AskUserQuestion,
         label: "UnknownTool",
         detail: "something",
       };
@@ -425,7 +426,7 @@ describe("ClaudePanel", () => {
             {
               timestamp: new Date("2025-01-12T10:30:00"),
               type: "tool",
-              icon: "🔧",
+              icon: ICONS.Bash,
               label: "Bash",
               detail: "test command",
             },
@@ -454,11 +455,11 @@ describe("ClaudePanel", () => {
     it("handles different emoji icons correctly", () => {
       // Test with different emoji icons to ensure width calculation is correct
       const activities: ActivityEntry[] = [
-        { timestamp: new Date("2025-01-12T10:30:00"), type: "user", icon: "💬", label: "User", detail: "hello world" },
-        { timestamp: new Date("2025-01-12T10:30:01"), type: "response", icon: "🤖", label: "Response", detail: "hi there" },
-        { timestamp: new Date("2025-01-12T10:30:02"), type: "tool", icon: "🔧", label: "Bash", detail: "npm test" },
-        { timestamp: new Date("2025-01-12T10:30:03"), type: "tool", icon: "📝", label: "Edit", detail: "file.ts" },
-        { timestamp: new Date("2025-01-12T10:30:04"), type: "tool", icon: "🔍", label: "Grep", detail: "pattern" },
+        { timestamp: new Date("2025-01-12T10:30:00"), type: "user", icon: ICONS.User, label: "User", detail: "hello world" },
+        { timestamp: new Date("2025-01-12T10:30:01"), type: "response", icon: ICONS.Response, label: "Response", detail: "hi there" },
+        { timestamp: new Date("2025-01-12T10:30:02"), type: "tool", icon: ICONS.Bash, label: "Bash", detail: "npm test" },
+        { timestamp: new Date("2025-01-12T10:30:03"), type: "tool", icon: ICONS.Edit, label: "Edit", detail: "file.ts" },
+        { timestamp: new Date("2025-01-12T10:30:04"), type: "tool", icon: ICONS.Grep, label: "Grep", detail: "pattern" },
       ];
 
       const data = createMockData({
@@ -490,7 +491,7 @@ describe("ClaudePanel", () => {
             {
               timestamp: new Date("2025-01-12T10:30:00"),
               type: "tool",
-              icon: "🔧",
+              icon: ICONS.Bash,
               label: "Bash",
               detail: detail90chars,
             },
@@ -518,7 +519,7 @@ describe("ClaudePanel", () => {
             {
               timestamp: new Date("2025-01-12T10:30:00"),
               type: "tool",
-              icon: "🔧",
+              icon: ICONS.Bash,
               label: "Bash",
               detail: detail60chars,
             },
@@ -546,28 +547,28 @@ describe("ClaudePanel", () => {
         {
           timestamp: new Date("2025-01-12T10:30:00"),
           type: "user",
-          icon: "💬",
+          icon: ICONS.User,
           label: "User",
           detail: "help me",
         },
         {
           timestamp: new Date("2025-01-12T10:30:05"),
           type: "response",
-          icon: "🤖",
+          icon: ICONS.Response,
           label: "Response",
           detail: "I will help",
         },
         {
           timestamp: new Date("2025-01-12T10:30:10"),
           type: "tool",
-          icon: "🔧",
+          icon: ICONS.Bash,
           label: "Bash",
           detail: "npm test",
         },
         {
           timestamp: new Date("2025-01-12T10:30:15"),
           type: "tool",
-          icon: "📝",
+          icon: ICONS.Edit,
           label: "Edit",
           detail: "file.ts",
         },

@@ -6,6 +6,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join, basename } from "path";
+import { ICONS } from "../types/index.js";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -90,20 +91,6 @@ const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
 const MAX_DETAIL_LENGTH = 45;
 
-// Tool icons mapping
-const TOOL_ICONS: Record<string, string> = {
-  Edit: "📝",
-  Write: "📝",
-  Read: "📖",
-  Bash: "🔧",
-  Glob: "🔍",
-  Grep: "🔍",
-  WebFetch: "🌐",
-  WebSearch: "🌐",
-  Task: "📋",
-  TodoWrite: "📝",
-  AskUserQuestion: "❓",
-};
 
 /**
  * Convert project path to Claude session directory path
@@ -280,7 +267,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
           activities.push({
             timestamp: lastTimestamp || new Date(),
             type: "user",
-            icon: "👤",
+            icon: ICONS.User,
             label: "User",
             detail: truncate(userText.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
           });
@@ -299,7 +286,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
           for (const block of messageContent) {
             if (block.type === "tool_use") {
               const toolName = block.name || "Tool";
-              const icon = TOOL_ICONS[toolName] || "🔧";
+              const icon = (ICONS as Record<string, string>)[toolName] || ICONS.Default;
               const detail = getToolDetail(toolName, block.input);
 
               activities.push({
@@ -316,7 +303,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
                 activities.push({
                   timestamp: lastTimestamp || new Date(),
                   type: "response",
-                  icon: "🤖",
+                  icon: ICONS.Response,
                   label: "Response",
                   detail: truncate(block.text.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
                 });

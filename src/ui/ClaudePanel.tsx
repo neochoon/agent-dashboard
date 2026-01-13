@@ -78,7 +78,8 @@ function formatActivityTime(date: Date): string {
 
 interface ActivityParts {
   timestamp: string;  // "[HH:MM:SS] "
-  content: string;    // "icon label: detail" or "icon label"
+  icon: string;       // ">" or "$" etc.
+  labelContent: string; // "label: detail" or "label"
   displayWidth: number;
 }
 
@@ -91,7 +92,7 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = varies, " " = 1, label, ": " = 2
   const timestamp = `[${time}] `;
   const timestampWidth = timestamp.length; // 12
-  const iconWidth = getDisplayWidth(icon); // Use actual icon width (emojis are typically 2-wide)
+  const iconWidth = getDisplayWidth(icon); // Use actual icon width
   const labelWidth = label.length;
   const separatorWidth = detail ? 2 : 0; // ": " if there's detail
 
@@ -120,14 +121,14 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
       detailDisplayWidth = currentWidth;
     }
 
-    const content = `${icon} ${label}: ${truncatedDetail}`;
+    const labelContent = `${label}: ${truncatedDetail}`;
     const displayWidth = totalPrefixWidth + detailDisplayWidth;
-    return { timestamp, content, displayWidth };
+    return { timestamp, icon, labelContent, displayWidth };
   }
 
-  const content = `${icon} ${label}`;
+  const labelContent = label;
   const displayWidth = totalPrefixWidth;
-  return { timestamp, content, displayWidth };
+  return { timestamp, icon, labelContent, displayWidth };
 }
 
 export function ClaudePanel({
@@ -205,7 +206,7 @@ export function ClaudePanel({
 
   for (let i = 0; i < state.activities.length; i++) {
     const activity = state.activities[i];
-    const { timestamp, content, displayWidth } = formatActivityParts(activity, contentWidth);
+    const { timestamp, icon, labelContent, displayWidth } = formatActivityParts(activity, contentWidth);
     const padding = Math.max(0, contentWidth - displayWidth);
     const style = getActivityStyle(activity);
 
@@ -213,7 +214,9 @@ export function ClaudePanel({
       <Text key={`activity-${i}`}>
         {BOX.v}{" "}
         <Text dimColor>{timestamp}</Text>
-        <Text color={style.color} dimColor={style.dimColor}>{content}</Text>
+        <Text color="cyan">{icon}</Text>
+        {" "}
+        <Text color={style.color} dimColor={style.dimColor}>{labelContent}</Text>
         {" ".repeat(padding)}
         {BOX.v}
       </Text>
