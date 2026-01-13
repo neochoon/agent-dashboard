@@ -5,6 +5,7 @@ import {
   getTodayStats,
   getUncommittedCount,
   getGitData,
+  getGitDataAsync,
   setExecFn,
   resetExecFn,
 } from "../src/data/git.js";
@@ -377,6 +378,136 @@ describe("git data module", () => {
       expect(result.commits).toHaveLength(1);
       expect(result.stats).toEqual({ added: 10, deleted: 5, files: 1 });
       expect(result.uncommitted).toBe(1);
+    });
+  });
+
+  describe("getGitDataAsync", () => {
+    it("returns branch from async command", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+        },
+      };
+
+      // Need to set sync mock for uncommitted count
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.branch).toBe("main");
+    });
+
+    it("returns commits from async command", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+          commits: 'echo "abc1234|2026-01-10T10:00:00+00:00|Test commit"',
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.commits).toHaveLength(1);
+      expect(result.commits[0].hash).toBe("abc1234");
+      expect(result.commits[0].message).toBe("Test commit");
+    });
+
+    it("returns stats from async command", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+          commits: "echo ''",
+          stats: 'printf "15\\t3\\tsrc/file.ts"',
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.stats.added).toBe(15);
+      expect(result.stats.deleted).toBe(3);
+      expect(result.stats.files).toBe(1);
+    });
+
+    it("handles binary files in stats", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+          commits: "echo ''",
+          stats: 'printf "10\\t5\\tcode.ts\\n-\\t-\\timage.png"',
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.stats.added).toBe(10);
+      expect(result.stats.deleted).toBe(5);
+      expect(result.stats.files).toBe(2);
+    });
+
+    it("handles branch command failure", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "exit 1",
+          commits: "echo ''",
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.branch).toBeNull();
+    });
+
+    it("handles commits command failure", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+          commits: "exit 1",
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.commits).toEqual([]);
+    });
+
+    it("handles stats command failure", async () => {
+      const config: GitPanelConfig = {
+        enabled: true,
+        interval: 30000,
+        command: {
+          branch: "echo main",
+          commits: "echo ''",
+          stats: "exit 1",
+        },
+      };
+
+      mockExec.mockReturnValue("\n");
+
+      const result = await getGitDataAsync(config);
+
+      expect(result.stats).toEqual({ added: 0, deleted: 0, files: 0 });
     });
   });
 });
