@@ -5,6 +5,7 @@ import {
   setClearFn,
   resetClearFn,
   getVersion,
+  getHelp,
 } from "../src/cli.js";
 
 describe("CLI argument parsing", () => {
@@ -64,6 +65,18 @@ describe("CLI argument parsing", () => {
 
       expect(result.command).toBe("version");
     });
+
+    it("returns help command with --help flag", () => {
+      const result = parseArgs(["--help"]);
+
+      expect(result.command).toBe("help");
+    });
+
+    it("returns help command with -h flag", () => {
+      const result = parseArgs(["-h"]);
+
+      expect(result.command).toBe("help");
+    });
   });
 
   describe("getVersion", () => {
@@ -71,6 +84,30 @@ describe("CLI argument parsing", () => {
       const version = getVersion();
 
       expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    });
+  });
+
+  describe("getHelp", () => {
+    it("returns help text with usage info", () => {
+      const help = getHelp();
+
+      expect(help).toContain("Usage:");
+      expect(help).toContain("agenthud");
+    });
+
+    it("includes available options", () => {
+      const help = getHelp();
+
+      expect(help).toContain("--help");
+      expect(help).toContain("--version");
+      expect(help).toContain("--once");
+      expect(help).toContain("--watch");
+    });
+
+    it("includes init command", () => {
+      const help = getHelp();
+
+      expect(help).toContain("init");
     });
   });
 

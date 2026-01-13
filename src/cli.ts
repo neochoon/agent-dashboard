@@ -4,7 +4,21 @@ import { fileURLToPath } from "url";
 
 export interface CliOptions {
   mode: "watch" | "once";
-  command?: "init" | "version";
+  command?: "init" | "version" | "help";
+}
+
+export function getHelp(): string {
+  return `Usage: agenthud [command] [options]
+
+Commands:
+  init              Initialize agenthud in current directory
+
+Options:
+  -w, --watch       Watch mode (default)
+  --once            Run once and exit
+  -V, --version     Show version number
+  -h, --help        Show this help message
+`;
 }
 
 export function getVersion(): string {
@@ -34,8 +48,14 @@ export function clearScreen(): void {
 export function parseArgs(args: string[]): CliOptions {
   const hasOnce = args.includes("--once");
   const hasVersion = args.includes("--version") || args.includes("-V");
+  const hasHelp = args.includes("--help") || args.includes("-h");
 
-  // Check for version flag first
+  // Check for help flag first
+  if (hasHelp) {
+    return { mode: "watch", command: "help" };
+  }
+
+  // Check for version flag
   if (hasVersion) {
     return { mode: "watch", command: "version" };
   }
