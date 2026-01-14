@@ -726,6 +726,138 @@ describe("claude data module", () => {
 
       expect(result.todos).toBeNull();
     });
+
+    it("skips TodoWrite tool from activities", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 2000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "TodoWrite", input: {} },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 1000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Should only have Edit and Bash, not TodoWrite
+      expect(result.activities.length).toBe(2);
+      expect(result.activities.map((a) => a.label)).toEqual(["Bash", "Edit"]);
+    });
+
+    it("aggregates consecutive same tool operations with count", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 4000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 3000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 2000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Should aggregate 3 Edit operations into 1 with count=3
+      expect(result.activities.length).toBe(2);
+      expect(result.activities[1].label).toBe("Edit");
+      expect(result.activities[1].count).toBe(3);
+      expect(result.activities[0].label).toBe("Bash");
+      expect(result.activities[0].count).toBeUndefined();
+    });
+
+    it("does not aggregate different file edits", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/file1.ts" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 2000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Edit", input: { file_path: "/file2.ts" } },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Should have 2 separate entries
+      expect(result.activities.length).toBe(2);
+      expect(result.activities[0].detail).toBe("file2.ts");
+      expect(result.activities[1].detail).toBe("file1.ts");
+      expect(result.activities[0].count).toBeUndefined();
+      expect(result.activities[1].count).toBeUndefined();
+    });
   });
 
   describe("getClaudeData", () => {

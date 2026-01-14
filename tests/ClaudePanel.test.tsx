@@ -869,4 +869,68 @@ describe("ClaudePanel", () => {
       expect(output).toContain("Todo (2/2 done)");
     });
   });
+
+  describe("activity count display", () => {
+    it("shows count suffix for aggregated activities", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: [
+            {
+              timestamp: new Date("2025-01-12T10:30:00"),
+              type: "tool",
+              icon: ICONS.Edit,
+              label: "Edit",
+              detail: "file.ts",
+              count: 3,
+            },
+          ],
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      expect(output).toContain("Edit: file.ts (×3)");
+    });
+
+    it("does not show count suffix when count is 1 or undefined", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: [
+            {
+              timestamp: new Date("2025-01-12T10:30:00"),
+              type: "tool",
+              icon: ICONS.Edit,
+              label: "Edit",
+              detail: "file.ts",
+              count: 1,
+            },
+            {
+              timestamp: new Date("2025-01-12T10:30:05"),
+              type: "tool",
+              icon: ICONS.Bash,
+              label: "Bash",
+              detail: "npm test",
+            },
+          ],
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      expect(output).toContain("Edit: file.ts");
+      expect(output).not.toContain("(×1)");
+      expect(output).toContain("Bash: npm test");
+      expect(output).not.toMatch(/npm test.*×/);
+    });
+  });
 });
