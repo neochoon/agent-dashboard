@@ -100,6 +100,7 @@ export interface ActivityEntry {
   icon: string;
   label: string;
   detail: string;
+  count?: number; // For aggregating consecutive same activities
 }
 
 export interface TodoItem {

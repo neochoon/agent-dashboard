@@ -105,6 +105,11 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   const icon = activity.icon;
   const label = activity.label;
   const detail = activity.detail;
+  const count = activity.count;
+
+  // Count suffix for aggregated activities (e.g., " (×3)")
+  const countSuffix = count && count > 1 ? ` (×${count})` : "";
+  const countSuffixWidth = countSuffix.length;
 
   // Skip label for User and Response - they're already distinguished by color
   const skipLabel = label === "User" || label === "Response";
@@ -117,7 +122,7 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   if (skipLabel && detail) {
     // For User/Response: just show detail without label
     const prefixWidth = timestampWidth + iconWidth + 1; // timestamp + icon + space
-    const availableWidth = maxWidth - prefixWidth;
+    const availableWidth = maxWidth - prefixWidth - countSuffixWidth;
     let truncatedDetail = detail;
     let detailDisplayWidth = getDisplayWidth(detail);
 
@@ -140,8 +145,8 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
     return {
       timestamp,
       icon,
-      labelContent: truncatedDetail,
-      displayWidth: prefixWidth + detailDisplayWidth,
+      labelContent: truncatedDetail + countSuffix,
+      displayWidth: prefixWidth + detailDisplayWidth + countSuffixWidth,
     };
   }
 
@@ -152,7 +157,7 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   const totalPrefixWidth = timestampWidth + contentPrefixWidth;
 
   if (detail) {
-    const availableWidth = maxWidth - totalPrefixWidth;
+    const availableWidth = maxWidth - totalPrefixWidth - countSuffixWidth;
     let truncatedDetail = detail;
     let detailDisplayWidth = getDisplayWidth(detail);
 
@@ -173,13 +178,13 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
       detailDisplayWidth = currentWidth;
     }
 
-    const labelContent = `${label}: ${truncatedDetail}`;
-    const displayWidth = totalPrefixWidth + detailDisplayWidth;
+    const labelContent = `${label}: ${truncatedDetail}${countSuffix}`;
+    const displayWidth = totalPrefixWidth + detailDisplayWidth + countSuffixWidth;
     return { timestamp, icon, labelContent, displayWidth };
   }
 
-  const labelContent = label;
-  const displayWidth = totalPrefixWidth;
+  const labelContent = label + countSuffix;
+  const displayWidth = totalPrefixWidth + countSuffixWidth;
   return { timestamp, icon, labelContent, displayWidth };
 }
 

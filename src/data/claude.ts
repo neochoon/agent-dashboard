@@ -43,6 +43,7 @@ export interface ActivityEntry {
   icon: string;
   label: string;
   detail: string;
+  count?: number; // For aggregating consecutive same activities
 }
 
 export interface TodoItem {
@@ -283,16 +284,36 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
           for (const block of messageContent) {
             if (block.type === "tool_use") {
               const toolName = block.name || "Tool";
+
+              // Skip TodoWrite - already shown in Todo section
+              if (toolName === "TodoWrite") {
+                lastType = "tool";
+                continue;
+              }
+
               const icon = (ICONS as Record<string, string>)[toolName] || ICONS.Default;
               const detail = getToolDetail(toolName, block.input);
 
-              activities.push({
-                timestamp: lastTimestamp || new Date(),
-                type: "tool",
-                icon,
-                label: toolName,
-                detail,
-              });
+              // Check if this is the same as the last activity (aggregate consecutive same operations)
+              const lastActivity = activities[activities.length - 1];
+              if (
+                lastActivity &&
+                lastActivity.type === "tool" &&
+                lastActivity.label === toolName &&
+                lastActivity.detail === detail
+              ) {
+                // Increment count on existing entry
+                lastActivity.count = (lastActivity.count || 1) + 1;
+                lastActivity.timestamp = lastTimestamp || new Date();
+              } else {
+                activities.push({
+                  timestamp: lastTimestamp || new Date(),
+                  type: "tool",
+                  icon,
+                  label: toolName,
+                  detail,
+                });
+              }
               lastType = "tool";
             } else if (block.type === "text" && block.text) {
               // Only add text response if it's substantial
