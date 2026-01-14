@@ -44,6 +44,7 @@ describe("ClaudePanel", () => {
       activities: mockActivities,
       tokenCount: 1500,
       sessionStartTime: null,
+      todos: null,
     },
     hasSession: true,
     timestamp: "2025-01-12T10:30:00Z",
@@ -59,6 +60,7 @@ describe("ClaudePanel", () => {
           activities: [],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -77,6 +79,7 @@ describe("ClaudePanel", () => {
           activities: [],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -93,6 +96,7 @@ describe("ClaudePanel", () => {
           activities: [],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -164,6 +168,7 @@ describe("ClaudePanel", () => {
           activities: mockActivities,
           tokenCount: 12500,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -179,6 +184,7 @@ describe("ClaudePanel", () => {
           activities: mockActivities,
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -268,6 +274,7 @@ describe("ClaudePanel", () => {
           activities: mockActivities,
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -357,6 +364,7 @@ describe("ClaudePanel", () => {
           ],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -551,6 +559,7 @@ describe("ClaudePanel", () => {
           ],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -617,6 +626,7 @@ describe("ClaudePanel", () => {
           ],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -646,6 +656,7 @@ describe("ClaudePanel", () => {
           ],
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -701,6 +712,7 @@ describe("ClaudePanel", () => {
           activities: mixedActivities,
           tokenCount: 0,
           sessionStartTime: null,
+          todos: null,
         },
       });
 
@@ -712,6 +724,145 @@ describe("ClaudePanel", () => {
       expect(output).toContain("I will help");
       expect(output).toContain("npm test");
       expect(output).toContain("file.ts");
+    });
+  });
+
+  describe("TodoSection", () => {
+    it("shows todo section when todos exist", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Create issue", status: "completed", activeForm: "Creating issue" },
+            { content: "Write tests", status: "in_progress", activeForm: "Writing tests" },
+            { content: "Implement", status: "pending", activeForm: "Implementing" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should show todo header with count
+      expect(output).toContain("Todo (1/3)");
+      // Should show completed task with content
+      expect(output).toContain("Create issue");
+      // Should show in_progress task with activeForm
+      expect(output).toContain("Writing tests");
+      // Should show pending task with content
+      expect(output).toContain("Implement");
+    });
+
+    it("shows correct icons for todo statuses", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Done task", status: "completed", activeForm: "Done" },
+            { content: "Current task", status: "in_progress", activeForm: "Working" },
+            { content: "Future task", status: "pending", activeForm: "Future" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should show completed icon
+      expect(output).toContain("✓");
+      // Should show in_progress icon (either ◐ or ◑)
+      expect(output.includes("◐") || output.includes("◑")).toBe(true);
+      // Should show pending icon
+      expect(output).toContain("○");
+    });
+
+    it("does not show todo section when todos is null", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      expect(output).not.toContain("Todo");
+    });
+
+    it("does not show todo section when todos is empty array", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      expect(output).not.toContain("Todo");
+    });
+
+    it("shows summary line when all todos completed", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Create issue", status: "completed", activeForm: "Creating issue" },
+            { content: "Write tests", status: "completed", activeForm: "Writing tests" },
+            { content: "Create PR", status: "completed", activeForm: "Creating PR" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should NOT show Todo section header
+      expect(output).not.toContain("Todo (");
+      // Should show summary line with last completed task
+      expect(output).toContain("✓");
+      expect(output).toContain("Todo: Create PR");
+      expect(output).toContain("3/3 done");
+    });
+
+    it("hides todo section when all completed but shows summary", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Task A", status: "completed", activeForm: "A" },
+            { content: "Task B", status: "completed", activeForm: "B" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should NOT show separator line (├─ Todo)
+      expect(output).not.toContain("├─ Todo");
+      // Should show summary
+      expect(output).toContain("2/2 done");
     });
   });
 });

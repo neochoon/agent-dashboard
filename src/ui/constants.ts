@@ -75,6 +75,16 @@ export function createBottomLine(panelWidth: number = DEFAULT_PANEL_WIDTH): stri
   return BOX.bl + BOX.h.repeat(getInnerWidth(panelWidth)) + BOX.br;
 }
 
+// Create separator line with title (for sub-sections)
+// Example: "├─ Todo (3/6) ──────────────────────────────────────┤"
+export function createSeparatorLine(title: string, panelWidth: number = DEFAULT_PANEL_WIDTH): string {
+  const leftPart = BOX.h + " " + title + " ";
+  const leftWidth = leftPart.length;
+  const dashCount = panelWidth - 1 - leftWidth - 1; // ml + leftPart + dashes + mr
+  const dashes = BOX.h.repeat(Math.max(0, dashCount));
+  return BOX.ml + leftPart + dashes + BOX.mr;
+}
+
 // Pad content to fit inner width (content goes between │ and │)
 export function padLine(content: string, panelWidth: number = DEFAULT_PANEL_WIDTH): string {
   const innerWidth = getInnerWidth(panelWidth);

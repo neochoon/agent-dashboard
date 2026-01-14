@@ -1,11 +1,12 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import type { ClaudeData, ClaudeSessionStatus, ActivityEntry } from "../types/index.js";
+import type { ClaudeData, ClaudeSessionStatus, ActivityEntry, TodoItem } from "../types/index.js";
 import {
   DEFAULT_PANEL_WIDTH,
   BOX,
   createTitleLine,
   createBottomLine,
+  createSeparatorLine,
   getInnerWidth,
   getDisplayWidth,
 } from "./constants.js";
@@ -147,6 +148,93 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   return { timestamp, icon, labelContent, displayWidth };
 }
 
+// Todo status icons
+const TODO_ICONS = {
+  completed: "✓",
+  in_progress_left: "◐",
+  in_progress_right: "◑",
+  pending: "○",
+} as const;
+
+interface TodoSectionProps {
+  todos: TodoItem[];
+  width: number;
+}
+
+function TodoSection({ todos, width }: TodoSectionProps): React.ReactElement {
+  const [tick, setTick] = useState(false);
+  const innerWidth = getInnerWidth(width);
+  const contentWidth = innerWidth - 1;
+
+  // Animate in_progress icon
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => !t), 500);
+    return () => clearInterval(timer);
+  }, []);
+
+  const completedCount = todos.filter((t) => t.status === "completed").length;
+  const totalCount = todos.length;
+  const headerTitle = `Todo (${completedCount}/${totalCount})`;
+
+  const inProgressIcon = tick ? TODO_ICONS.in_progress_left : TODO_ICONS.in_progress_right;
+
+  return (
+    <>
+      <Text>{createSeparatorLine(headerTitle, width)}</Text>
+      {todos.map((todo, i) => {
+        let icon: string;
+        let iconColor: string | undefined;
+
+        switch (todo.status) {
+          case "completed":
+            icon = TODO_ICONS.completed;
+            iconColor = "green";
+            break;
+          case "in_progress":
+            icon = inProgressIcon;
+            iconColor = "yellow";
+            break;
+          default:
+            icon = TODO_ICONS.pending;
+            iconColor = undefined;
+        }
+
+        // Use activeForm for in_progress, content for others
+        const text = todo.status === "in_progress" ? todo.activeForm : todo.content;
+        const maxTextWidth = contentWidth - 3; // icon + space + border
+        let displayText = text;
+        if (getDisplayWidth(text) > maxTextWidth) {
+          displayText = "";
+          let currentWidth = 0;
+          for (const char of text) {
+            const charWidth = getDisplayWidth(char);
+            if (currentWidth + charWidth > maxTextWidth - 3) {
+              displayText += "...";
+              currentWidth += 3;
+              break;
+            }
+            displayText += char;
+            currentWidth += charWidth;
+          }
+        }
+
+        const padding = Math.max(0, contentWidth - getDisplayWidth(icon) - 1 - getDisplayWidth(displayText));
+
+        return (
+          <Text key={`todo-${i}`}>
+            {BOX.v}{" "}
+            <Text color={iconColor}>{icon}</Text>
+            {" "}
+            <Text dimColor={todo.status === "completed"}>{displayText}</Text>
+            {" ".repeat(padding)}
+            {BOX.v}
+          </Text>
+        );
+      })}
+    </>
+  );
+}
+
 export function ClaudePanel({
   data,
   countdown,
@@ -261,10 +349,57 @@ export function ClaudePanel({
     );
   }
 
+  // Check if todos exist and determine display mode
+  const hasTodos = state.todos && state.todos.length > 0;
+  const allCompleted = hasTodos && state.todos!.every((t) => t.status === "completed");
+
+  // If all todos completed, add summary line to activities
+  if (hasTodos && allCompleted) {
+    const todos = state.todos!;
+    const lastCompleted = todos[todos.length - 1];
+    const summaryText = `Todo: ${lastCompleted.content} (${todos.length}/${todos.length} done)`;
+    const summaryIcon = "✓";
+    const summaryPrefix = `${summaryIcon} `;
+    const maxSummaryWidth = contentWidth - getDisplayWidth(summaryPrefix);
+
+    let displaySummary = summaryText;
+    if (getDisplayWidth(summaryText) > maxSummaryWidth) {
+      displaySummary = "";
+      let currentWidth = 0;
+      for (const char of summaryText) {
+        const charWidth = getDisplayWidth(char);
+        if (currentWidth + charWidth > maxSummaryWidth - 3) {
+          displaySummary += "...";
+          break;
+        }
+        displaySummary += char;
+        currentWidth += charWidth;
+      }
+    }
+
+    const summaryPadding = Math.max(0, contentWidth - getDisplayWidth(summaryPrefix) - getDisplayWidth(displaySummary));
+    lines.push(
+      <Text key="todo-summary">
+        {BOX.v}{" "}
+        <Text color="green">{summaryIcon}</Text>
+        {" "}
+        <Text color="green">{displaySummary}</Text>
+        {" ".repeat(summaryPadding)}
+        {BOX.v}
+      </Text>
+    );
+  }
+
+  // Show TodoSection only if todos exist and not all completed
+  const showTodoSection = hasTodos && !allCompleted;
+
   return (
     <Box flexDirection="column" width={width}>
       <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
       {lines}
+      {showTodoSection && (
+        <TodoSection todos={state.todos!} width={width} />
+      )}
       <Text>{createBottomLine(width)}</Text>
     </Box>
   );

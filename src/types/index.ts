@@ -102,11 +102,18 @@ export interface ActivityEntry {
   detail: string;
 }
 
+export interface TodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm: string;
+}
+
 export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
   activities: ActivityEntry[];
   tokenCount: number;
   sessionStartTime: Date | null;
+  todos: TodoItem[] | null;
 }
 
 export interface ClaudeData {
