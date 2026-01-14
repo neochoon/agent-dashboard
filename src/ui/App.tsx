@@ -16,6 +16,7 @@ import { getOtherSessionsData, type OtherSessionsData } from "../data/otherSessi
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
+import { getVersion } from "../cli.js";
 import type { TestData, ClaudeData, GenericPanelRenderer } from "../types/index.js";
 
 interface AppProps {
@@ -724,7 +725,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         return null;
       })}
       {mode === "watch" && (
-        <Box marginTop={1} width={width}>
+        <Box marginTop={1} width={width} justifyContent="space-between">
           <Text dimColor>
             {statusBarItems.map((item, index) => (
               <React.Fragment key={index}>
@@ -734,6 +735,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
               </React.Fragment>
             ))}
           </Text>
+          <Text dimColor>AgentHUD v{getVersion()}</Text>
         </Box>
       )}
     </Box>
