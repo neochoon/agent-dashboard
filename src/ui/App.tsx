@@ -219,10 +219,22 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const [testData, setTestData] = useState<TestData>(() => getTestDataFromConfig());
+  // Compute initial test data and disabled state together (avoid setState in useState)
+  const initialTestData = useMemo(() => getTestDataFromConfig(), [getTestDataFromConfig]);
+  const initialTestsDisabled = !!(initialTestData.error && config.panels.tests.command);
+
+  // Track if tests panel should be disabled due to command errors
+  const [testsDisabled, setTestsDisabled] = useState(initialTestsDisabled);
+  const [testData, setTestData] = useState<TestData>(initialTestData);
+
   const refreshTest = useCallback(() => {
-    setTestData(getTestDataFromConfig());
-  }, [getTestDataFromConfig]);
+    const data = getTestDataFromConfig();
+    // Disable panel if command fails, re-enable if it succeeds
+    if (config.panels.tests.command) {
+      setTestsDisabled(!!data.error);
+    }
+    setTestData(data);
+  }, [getTestDataFromConfig, config.panels.tests.command]);
 
   // Claude data
   const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd, config.panels.claude.maxActivities));
@@ -364,7 +376,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       // Tests still use sync for now, but wrapped in setTimeout to allow UI update
       await new Promise<void>((resolve) => {
         setTimeout(() => {
-          setTestData(getTestDataFromConfig());
+          const data = getTestDataFromConfig();
+          // Disable panel if command fails, re-enable if it succeeds
+          if (config.panels.tests.command) {
+            setTestsDisabled(!!data.error);
+          }
+          setTestData(data);
           resolve();
         }, 0);
       });
@@ -372,7 +389,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       setVisualState("tests", { isRunning: false, justCompleted: true });
       clearFeedback("tests", "justCompleted");
     }
-  }, [getTestDataFromConfig, setVisualState, clearFeedback]);
+  }, [getTestDataFromConfig, setVisualState, clearFeedback, config.panels.tests.command]);
 
   // Claude panel refresh with visual feedback (file-based)
   const refreshClaudeWithFeedback = useCallback(() => {
@@ -628,8 +645,8 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           );
         }
 
-        // Tests panel
-        if (panelName === "tests" && config.panels.tests.enabled) {
+        // Tests panel (skip if disabled due to command error)
+        if (panelName === "tests" && config.panels.tests.enabled && !testsDisabled) {
           const testsVisual = visualStates.tests || DEFAULT_VISUAL_STATE;
           return (
             <Box key={`panel-tests-${index}`} marginTop={isFirst ? 0 : 1}>
