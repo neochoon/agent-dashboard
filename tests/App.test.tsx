@@ -13,6 +13,10 @@ import {
   resetReadFileFn as resetTestsReadFileFn,
 } from "../src/data/tests.js";
 import {
+  setExecFn as setRunnerExecFn,
+  resetExecFn as resetRunnerExecFn,
+} from "../src/runner/command.js";
+import {
   setFsMock as setClaudeFsMock,
   resetFsMock as resetClaudeFsMock,
   type FsMock as ClaudeFsMock,
@@ -80,6 +84,7 @@ panels:
     resetTestsReadFileFn();
     resetClaudeFsMock();
     resetOtherSessionsFsMock();
+    resetRunnerExecFn();
   });
 
   describe("rendering", () => {
@@ -184,6 +189,130 @@ panels:
       // Width should be consistent (either fallback 80 or detected)
       expect(widths[0]).toBeGreaterThanOrEqual(50);
       expect(widths[0]).toBeLessThanOrEqual(120);
+    });
+  });
+
+  describe("testsDisabled", () => {
+    it("disables Tests panel when test command fails initially", () => {
+      // Mock git commands
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) {
+          return "main\n";
+        }
+        return "";
+      });
+
+      // Mock config with test command
+      configFsMock.readFileSync = vi.fn().mockReturnValue(`
+panels:
+  git:
+    enabled: true
+    interval: 30s
+  tests:
+    enabled: true
+    interval: manual
+    command: npx vitest run --reporter=json
+`);
+
+      // Mock test runner to fail
+      setRunnerExecFn(() => {
+        throw new Error("Command failed: npx vitest run --reporter=json");
+      });
+
+      const { lastFrame } = render(<App mode="once" />);
+
+      // Tests panel should NOT be rendered when command fails
+      expect(lastFrame()).not.toContain("Tests");
+    });
+
+    it("shows Tests panel when test command succeeds", () => {
+      // Mock git commands
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) {
+          return "main\n";
+        }
+        if (cmd.includes("rev-parse --short HEAD")) {
+          return "abc1234\n";
+        }
+        return "";
+      });
+
+      // Mock config with test command
+      configFsMock.readFileSync = vi.fn().mockReturnValue(`
+panels:
+  git:
+    enabled: true
+    interval: 30s
+  tests:
+    enabled: true
+    interval: manual
+    command: npx vitest run --reporter=json
+`);
+
+      // Mock test runner to succeed with valid JSON
+      setRunnerExecFn((cmd: string) => {
+        if (cmd.includes("vitest")) {
+          return JSON.stringify({
+            numPassedTests: 10,
+            numFailedTests: 0,
+            numPendingTests: 0,
+            testResults: [],
+          });
+        }
+        if (cmd.includes("rev-parse")) {
+          return "abc1234\n";
+        }
+        return "";
+      });
+
+      const { lastFrame } = render(<App mode="once" />);
+
+      // Tests panel should be rendered when command succeeds
+      expect(lastFrame()).toContain("Tests");
+      expect(lastFrame()).toContain("10 passed");
+    });
+
+    it("shows Tests panel when no command is configured (file-based)", () => {
+      // Mock git commands
+      mockExec.mockImplementation((cmd: string) => {
+        if (cmd.includes("branch --show-current")) {
+          return "main\n";
+        }
+        if (cmd.includes("rev-parse --short HEAD")) {
+          return "abc1234\n";
+        }
+        return "";
+      });
+
+      // Mock config WITHOUT test command (file-based mode)
+      configFsMock.readFileSync = vi.fn().mockReturnValue(`
+panels:
+  git:
+    enabled: true
+    interval: 30s
+  tests:
+    enabled: true
+    interval: manual
+`);
+
+      // Mock test results file to return valid TestResults format
+      setTestsReadFileFn(() => {
+        return JSON.stringify({
+          hash: "abc1234",
+          timestamp: "2025-01-01T00:00:00Z",
+          passed: 5,
+          failed: 1,
+          skipped: 0,
+          failures: [{ file: "test.ts", name: "test1" }],
+        });
+      });
+
+      const { lastFrame } = render(<App mode="once" />);
+
+      // Tests panel should be rendered when file-based data is available
+      // (testsDisabled only applies to command-based tests)
+      expect(lastFrame()).toContain("Tests");
+      expect(lastFrame()).toContain("5 passed");
     });
   });
 });

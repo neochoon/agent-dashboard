@@ -212,9 +212,6 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [config.panels.git]);
 
   // Test data - uses config command or falls back to file
-  // Track if tests panel should be disabled due to command errors
-  const [testsDisabled, setTestsDisabled] = useState(false);
-
   const getTestDataFromConfig = useCallback((): TestData => {
     if (config.panels.tests.command) {
       return runTestCommand(config.panels.tests.command);
@@ -222,20 +219,19 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const [testData, setTestData] = useState<TestData>(() => {
-    const data = getTestDataFromConfig();
-    // Disable panel if command fails on first run
-    if (data.error && config.panels.tests.command) {
-      setTestsDisabled(true);
-    }
-    return data;
-  });
+  // Compute initial test data and disabled state together (avoid setState in useState)
+  const initialTestData = useMemo(() => getTestDataFromConfig(), [getTestDataFromConfig]);
+  const initialTestsDisabled = !!(initialTestData.error && config.panels.tests.command);
+
+  // Track if tests panel should be disabled due to command errors
+  const [testsDisabled, setTestsDisabled] = useState(initialTestsDisabled);
+  const [testData, setTestData] = useState<TestData>(initialTestData);
 
   const refreshTest = useCallback(() => {
     const data = getTestDataFromConfig();
-    // Disable panel if command fails
-    if (data.error && config.panels.tests.command) {
-      setTestsDisabled(true);
+    // Disable panel if command fails, re-enable if it succeeds
+    if (config.panels.tests.command) {
+      setTestsDisabled(!!data.error);
     }
     setTestData(data);
   }, [getTestDataFromConfig, config.panels.tests.command]);
@@ -380,7 +376,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       // Tests still use sync for now, but wrapped in setTimeout to allow UI update
       await new Promise<void>((resolve) => {
         setTimeout(() => {
-          setTestData(getTestDataFromConfig());
+          const data = getTestDataFromConfig();
+          // Disable panel if command fails, re-enable if it succeeds
+          if (config.panels.tests.command) {
+            setTestsDisabled(!!data.error);
+          }
+          setTestData(data);
           resolve();
         }, 0);
       });
@@ -388,7 +389,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       setVisualState("tests", { isRunning: false, justCompleted: true });
       clearFeedback("tests", "justCompleted");
     }
-  }, [getTestDataFromConfig, setVisualState, clearFeedback]);
+  }, [getTestDataFromConfig, setVisualState, clearFeedback, config.panels.tests.command]);
 
   // Claude panel refresh with visual feedback (file-based)
   const refreshClaudeWithFeedback = useCallback(() => {
