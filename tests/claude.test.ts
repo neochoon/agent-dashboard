@@ -637,6 +637,95 @@ describe("claude data module", () => {
       expect(result.activities[0].label).toBe("Bash");
       expect(result.activities[0].detail).toBe("npm test");
     });
+
+    it("parses todos from toolUseResult in user entry", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "123", content: "Todos modified" },
+            ],
+          },
+          toolUseResult: {
+            newTodos: [
+              { content: "Create issue", status: "completed", activeForm: "Creating issue" },
+              { content: "Write tests", status: "in_progress", activeForm: "Writing tests" },
+              { content: "Implement feature", status: "pending", activeForm: "Implementing" },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.todos).toBeDefined();
+      expect(result.todos).toHaveLength(3);
+      expect(result.todos![0].content).toBe("Create issue");
+      expect(result.todos![0].status).toBe("completed");
+      expect(result.todos![1].status).toBe("in_progress");
+      expect(result.todos![2].status).toBe("pending");
+    });
+
+    it("uses latest todos when multiple toolUseResult entries exist", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: [{ type: "tool_result", tool_use_id: "1", content: "" }] },
+          toolUseResult: {
+            newTodos: [
+              { content: "Task A", status: "in_progress", activeForm: "A" },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 5000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: [{ type: "tool_result", tool_use_id: "2", content: "" }] },
+          toolUseResult: {
+            newTodos: [
+              { content: "Task A", status: "completed", activeForm: "A" },
+              { content: "Task B", status: "in_progress", activeForm: "B" },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.todos).toHaveLength(2);
+      expect(result.todos![0].status).toBe("completed");
+      expect(result.todos![1].status).toBe("in_progress");
+    });
+
+    it("returns null todos when no toolUseResult exists", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Hello" },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.todos).toBeNull();
+    });
   });
 
   describe("getClaudeData", () => {

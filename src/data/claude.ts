@@ -45,11 +45,18 @@ export interface ActivityEntry {
   detail: string;
 }
 
+export interface TodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm: string;
+}
+
 export interface ClaudeSessionState {
   status: ClaudeSessionStatus;
   activities: ActivityEntry[];
   tokenCount: number;
   sessionStartTime: Date | null;
+  todos: TodoItem[] | null;
 }
 
 export interface ClaudeData {
@@ -62,6 +69,13 @@ interface JsonlUserEntry {
   type: "user";
   message: { role: string; content: string | unknown[] };
   timestamp: string;
+  toolUseResult?: {
+    newTodos?: Array<{
+      content: string;
+      status: "pending" | "in_progress" | "completed";
+      activeForm: string;
+    }>;
+  };
 }
 
 interface JsonlAssistantEntry {
@@ -168,6 +182,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     activities: [],
     tokenCount: 0,
     sessionStartTime: null,
+    todos: null,
   };
 
   if (!fs.existsSync(sessionFile)) {
@@ -204,6 +219,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
   let tokenCount = 0;
   let lastTimestamp: Date | null = null;
   let lastType: "user" | "tool" | "response" | "stop" | null = null;
+  let todos: TodoItem[] | null = null;
 
   // Parse recent lines (up to MAX_LINES_TO_SCAN)
   const recentLines = lines.slice(-MAX_LINES_TO_SCAN);
@@ -243,6 +259,16 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
             detail: userText.replace(/\n/g, " "),
           });
         }
+
+        // Extract todos from toolUseResult (keep latest)
+        if (userEntry.toolUseResult?.newTodos) {
+          todos = userEntry.toolUseResult.newTodos.map((t) => ({
+            content: t.content,
+            status: t.status,
+            activeForm: t.activeForm,
+          }));
+        }
+
         lastType = "user";
       }
 
@@ -330,6 +356,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     activities: activities.slice(-maxActivities).reverse(),
     tokenCount,
     sessionStartTime,
+    todos,
   };
 }
 
@@ -342,6 +369,7 @@ export function getClaudeData(projectPath: string, maxActivities?: number): Clau
     activities: [],
     tokenCount: 0,
     sessionStartTime: null,
+    todos: null,
   };
 
   try {
