@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Internal
+- **Auto Deploy** - npm publish and GitHub Release on tag push (`v*`)
+
 ## [0.6.1] - 2025-01-15
 
 ### New
