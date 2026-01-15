@@ -1,12 +1,9 @@
-import { execSync as nodeExecSync, exec as nodeExec } from "child_process";
+import { execSync, exec } from "child_process";
 import { promisify } from "util";
 import type { Commit, GitStats } from "../types/index.js";
 import type { GitPanelConfig } from "../config/parser.js";
 
-type ExecFn = (command: string, options?: { encoding: string; shell?: string }) => string;
-type AsyncExecFn = (command: string, options?: { encoding: string; shell?: string }) => Promise<string>;
-
-const execAsync = promisify(nodeExec);
+const execAsync = promisify(exec);
 
 // Strip BOM and surrounding quotes from output (Windows compatibility)
 function cleanOutput(str: string): string {
@@ -17,22 +14,9 @@ function cleanOutput(str: string): string {
   return result.trim();
 }
 
-// Default executor - can be overridden for testing
-let execFn: ExecFn = (command, options) =>
-  nodeExecSync(command, options as Parameters<typeof nodeExecSync>[1]) as string;
-
-export function setExecFn(fn: ExecFn): void {
-  execFn = fn;
-}
-
-export function resetExecFn(): void {
-  execFn = (command, options) =>
-    nodeExecSync(command, options as Parameters<typeof nodeExecSync>[1]) as string;
-}
-
 export function getCurrentBranch(): string | null {
   try {
-    const result = execFn("git branch --show-current", {
+    const result = execSync("git branch --show-current", {
       encoding: "utf-8",
     });
     return result.trim();
@@ -43,7 +27,7 @@ export function getCurrentBranch(): string | null {
 
 export function getTodayCommits(): Commit[] {
   try {
-    const result = execFn('git log --since=midnight --format="%h|%aI|%s"', {
+    const result = execSync('git log --since=midnight --format="%h|%aI|%s"', {
       encoding: "utf-8",
     });
 
@@ -64,7 +48,7 @@ export function getTodayCommits(): Commit[] {
 
 export function getTodayStats(): GitStats {
   try {
-    const result = execFn('git log --since=midnight --numstat --format=""', {
+    const result = execSync('git log --since=midnight --numstat --format=""', {
       encoding: "utf-8",
     });
 
@@ -94,7 +78,7 @@ export function getTodayStats(): GitStats {
 
 export function getUncommittedCount(): number {
   try {
-    const result = execFn("git status --porcelain", {
+    const result = execSync("git status --porcelain", {
       encoding: "utf-8",
     });
 
@@ -164,7 +148,7 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get branch
   let branch: string | null = null;
   try {
-    const result = execFn(commands.branch, { encoding: "utf-8" });
+    const result = execSync(commands.branch, { encoding: "utf-8" });
     branch = result.trim();
   } catch {
     branch = null;
@@ -173,7 +157,7 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get commits
   let commits: Commit[] = [];
   try {
-    const result = execFn(commands.commits, { encoding: "utf-8" });
+    const result = execSync(commands.commits, { encoding: "utf-8" });
     commits = parseCommitsOutput(result);
   } catch {
     commits = [];
@@ -182,7 +166,7 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get stats
   let stats: GitStats = { added: 0, deleted: 0, files: 0 };
   try {
-    const result = execFn(commands.stats, { encoding: "utf-8" });
+    const result = execSync(commands.stats, { encoding: "utf-8" });
     stats = parseStatsOutput(result);
   } catch {
     stats = { added: 0, deleted: 0, files: 0 };

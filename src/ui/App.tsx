@@ -154,7 +154,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
   const initialTestData = useMemo(() => getTestDataFromConfig(), [getTestDataFromConfig]);
   const [testsDisabled, setTestsDisabled] = useState(
-    !!(initialTestData.error && config.panels.tests.command)
+    !!(initialTestData.error && !config.panels.tests.command)
   );
   const [testData, setTestData] = useState<TestData>(initialTestData);
 

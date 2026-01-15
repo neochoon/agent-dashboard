@@ -1,51 +1,10 @@
-import { execSync as nodeExecSync } from "child_process";
+import { execSync } from "child_process";
 import {
-  existsSync as nodeExistsSync,
-  readFileSync as nodeReadFileSync,
-  readdirSync as nodeReaddirSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
 } from "fs";
 import { basename } from "path";
-
-// Dependency injection for testing
-type FileExistsFn = (path: string) => boolean;
-type ReadFileFn = (path: string) => string;
-type ExecFn = (command: string, options: { encoding: string }) => string;
-type ReaddirFn = (path: string) => string[];
-
-let fileExistsFn: FileExistsFn = nodeExistsSync;
-let readFileFn: ReadFileFn = (path) => nodeReadFileSync(path, "utf-8");
-let execFn: ExecFn = (cmd, opts) =>
-  nodeExecSync(cmd, opts as Parameters<typeof nodeExecSync>[1]) as string;
-let readdirFn: ReaddirFn = nodeReaddirSync as ReaddirFn;
-
-export function setFileExistsFn(fn: FileExistsFn): void {
-  fileExistsFn = fn;
-}
-export function resetFileExistsFn(): void {
-  fileExistsFn = nodeExistsSync;
-}
-
-export function setReadFileFn(fn: ReadFileFn): void {
-  readFileFn = fn;
-}
-export function resetReadFileFn(): void {
-  readFileFn = (path) => nodeReadFileSync(path, "utf-8");
-}
-
-export function setExecFn(fn: ExecFn): void {
-  execFn = fn;
-}
-export function resetExecFn(): void {
-  execFn = (cmd, opts) =>
-    nodeExecSync(cmd, opts as Parameters<typeof nodeExecSync>[1]) as string;
-}
-
-export function setReaddirFn(fn: ReaddirFn): void {
-  readdirFn = fn;
-}
-export function resetReaddirFn(): void {
-  readdirFn = nodeReaddirSync as ReaddirFn;
-}
 
 // Language detection order (first match wins)
 const LANGUAGE_INDICATORS: Array<{ file: string; language: string }> = [
@@ -152,7 +111,7 @@ export interface ProjectData {
 
 export function detectLanguage(): string | null {
   for (const { file, language } of LANGUAGE_INDICATORS) {
-    if (fileExistsFn(file)) {
+    if (existsSync(file)) {
       return language;
     }
   }
@@ -308,7 +267,7 @@ function parseSetupPy(content: string): ProjectInfo {
 
 function getFolderName(): string {
   try {
-    return execFn("basename \"$PWD\"", { encoding: "utf-8" }).trim();
+    return execSync("basename \"$PWD\"", { encoding: "utf-8" }).trim();
   } catch {
     return basename(process.cwd());
   }
@@ -316,9 +275,9 @@ function getFolderName(): string {
 
 export function getProjectInfo(): ProjectInfo {
   // Try package.json first
-  if (fileExistsFn("package.json")) {
+  if (existsSync("package.json")) {
     try {
-      const content = readFileFn("package.json");
+      const content = readFileSync("package.json", "utf-8");
       return parsePackageJson(content);
     } catch {
       // Fall through
@@ -326,9 +285,9 @@ export function getProjectInfo(): ProjectInfo {
   }
 
   // Try pyproject.toml
-  if (fileExistsFn("pyproject.toml")) {
+  if (existsSync("pyproject.toml")) {
     try {
-      const content = readFileFn("pyproject.toml");
+      const content = readFileSync("pyproject.toml", "utf-8");
       return parsePyprojectToml(content);
     } catch {
       // Fall through
@@ -336,9 +295,9 @@ export function getProjectInfo(): ProjectInfo {
   }
 
   // Try setup.py
-  if (fileExistsFn("setup.py")) {
+  if (existsSync("setup.py")) {
     try {
-      const content = readFileFn("setup.py");
+      const content = readFileSync("setup.py", "utf-8");
       return parseSetupPy(content);
     } catch {
       // Fall through
@@ -378,7 +337,7 @@ export function detectStack(deps: string[]): string[] {
 
 function findSourceDir(): string | null {
   for (const dir of SOURCE_DIRS) {
-    if (fileExistsFn(dir)) {
+    if (existsSync(dir)) {
       return dir;
     }
   }
@@ -402,7 +361,7 @@ export function countFiles(language: string | null): FileCount {
     const namePatterns = config.patterns.map((p) => `-name "${p}"`).join(" -o ");
 
     const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print | wc -l`;
-    const result = execFn(cmd, { encoding: "utf-8" });
+    const result = execSync(cmd, { encoding: "utf-8" });
     const count = parseInt(result.trim(), 10) || 0;
 
     return { count, extension: config.ext };
@@ -428,7 +387,7 @@ export function countLines(language: string | null): number {
     const namePatterns = config.patterns.map((p) => `-name "${p}"`).join(" -o ");
 
     const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print0 | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}'`;
-    const result = execFn(cmd, { encoding: "utf-8" });
+    const result = execSync(cmd, { encoding: "utf-8" });
     return parseInt(result.trim(), 10) || 0;
   } catch {
     return 0;
