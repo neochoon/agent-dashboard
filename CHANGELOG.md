@@ -6,6 +6,11 @@
 - **Token Usage in Title** - See session token count (input + cache + output) in Claude panel title
 - **Subagent Tokens** - Includes token usage from subagent sessions
 
+### Internal
+- **Refactored App.tsx** - Extracted reusable hooks (useCountdown, useVisualFeedback, useHotkeys, usePanelData)
+- Reduced App.tsx from 750 to 487 lines (-35%)
+- Added 59 new tests for extracted hooks
+
 ## [0.6.0] - 2025-01-14
 
 ### New
