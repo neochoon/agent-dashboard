@@ -425,6 +425,10 @@ describe("claude data module", () => {
 
     it("includes subagent tokens when subagents folder exists", () => {
       const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+      const subagentsDir = join("/fake", "session", "subagents");
+      const subagentFile = join(subagentsDir, "agent-abc123.jsonl");
+
       const mainSessionLines = [
         JSON.stringify({
           type: "assistant",
@@ -448,21 +452,21 @@ describe("claude data module", () => {
       ].join("\n");
 
       mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === "/fake/session.jsonl") return true;
-        if (path === "/fake/session/subagents") return true;
+        if (path === sessionFile) return true;
+        if (path === subagentsDir) return true;
         return false;
       });
       mockFs.readFileSync.mockImplementation((path: string) => {
-        if (path === "/fake/session.jsonl") return mainSessionLines;
-        if (path === "/fake/session/subagents/agent-abc123.jsonl") return subagentLines;
+        if (path === sessionFile) return mainSessionLines;
+        if (path === subagentFile) return subagentLines;
         return "";
       });
       mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path === "/fake/session/subagents") return ["agent-abc123.jsonl"];
+        if (path === subagentsDir) return ["agent-abc123.jsonl"];
         return [];
       });
 
-      const result = parseSessionState("/fake/session.jsonl");
+      const result = parseSessionState(sessionFile);
 
       // Main: 100 + 1000 + 50 = 1150
       // Subagent: 50 + 500 + 25 = 575
@@ -472,6 +476,11 @@ describe("claude data module", () => {
 
     it("handles multiple subagent files", () => {
       const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+      const subagentsDir = join("/fake", "session", "subagents");
+      const subagent1File = join(subagentsDir, "agent-1.jsonl");
+      const subagent2File = join(subagentsDir, "agent-2.jsonl");
+
       const mainSessionLines = [
         JSON.stringify({
           type: "assistant",
@@ -506,22 +515,22 @@ describe("claude data module", () => {
       ].join("\n");
 
       mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === "/fake/session.jsonl") return true;
-        if (path === "/fake/session/subagents") return true;
+        if (path === sessionFile) return true;
+        if (path === subagentsDir) return true;
         return false;
       });
       mockFs.readFileSync.mockImplementation((path: string) => {
-        if (path === "/fake/session.jsonl") return mainSessionLines;
-        if (path === "/fake/session/subagents/agent-1.jsonl") return subagent1Lines;
-        if (path === "/fake/session/subagents/agent-2.jsonl") return subagent2Lines;
+        if (path === sessionFile) return mainSessionLines;
+        if (path === subagent1File) return subagent1Lines;
+        if (path === subagent2File) return subagent2Lines;
         return "";
       });
       mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path === "/fake/session/subagents") return ["agent-1.jsonl", "agent-2.jsonl"];
+        if (path === subagentsDir) return ["agent-1.jsonl", "agent-2.jsonl"];
         return [];
       });
 
-      const result = parseSessionState("/fake/session.jsonl");
+      const result = parseSessionState(sessionFile);
 
       // Main: 100, Sub1: 200, Sub2: 300 = 600
       expect(result.tokenCount).toBe(600);
@@ -529,6 +538,8 @@ describe("claude data module", () => {
 
     it("works normally when subagents folder does not exist", () => {
       const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+
       const mainSessionLines = [
         JSON.stringify({
           type: "assistant",
@@ -541,12 +552,12 @@ describe("claude data module", () => {
       ].join("\n");
 
       mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === "/fake/session.jsonl") return true;
+        if (path === sessionFile) return true;
         return false; // subagents folder doesn't exist
       });
       mockFs.readFileSync.mockReturnValue(mainSessionLines);
 
-      const result = parseSessionState("/fake/session.jsonl");
+      const result = parseSessionState(sessionFile);
 
       expect(result.tokenCount).toBe(100);
     });
