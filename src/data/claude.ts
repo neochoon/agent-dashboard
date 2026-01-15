@@ -6,7 +6,18 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join, basename } from "path";
-import { ICONS } from "../types/index.js";
+import {
+  ICONS,
+  type ClaudeSessionStatus,
+  type ActivityEntry,
+  type TodoItem,
+  type ClaudeSessionState,
+  type ClaudeData,
+} from "../types/index.js";
+import { FIVE_MINUTES_MS, THIRTY_SECONDS_MS } from "../ui/constants.js";
+
+// Re-export types for backwards compatibility
+export type { ClaudeSessionStatus, ActivityEntry, TodoItem, ClaudeSessionState, ClaudeData };
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -33,37 +44,6 @@ export function resetFsMock(): void {
     readdirSync: (path: string) => nodeReaddirSync(path) as string[],
     statSync: nodeStatSync,
   };
-}
-
-export type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
-
-export interface ActivityEntry {
-  timestamp: Date;
-  type: "tool" | "response" | "user";
-  icon: string;
-  label: string;
-  detail: string;
-  count?: number; // For aggregating consecutive same activities
-}
-
-export interface TodoItem {
-  content: string;
-  status: "pending" | "in_progress" | "completed";
-  activeForm: string;
-}
-
-export interface ClaudeSessionState {
-  status: ClaudeSessionStatus;
-  activities: ActivityEntry[];
-  tokenCount: number;
-  sessionStartTime: Date | null;
-  todos: TodoItem[] | null;
-}
-
-export interface ClaudeData {
-  state: ClaudeSessionState;
-  error?: string;
-  timestamp: string;
 }
 
 interface JsonlUserEntry {
@@ -105,8 +85,6 @@ interface JsonlSystemEntry {
 
 type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { type: string };
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
-const THIRTY_SECONDS_MS = 30 * 1000;
 const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
 /**
