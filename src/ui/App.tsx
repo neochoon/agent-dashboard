@@ -8,6 +8,9 @@ import { OtherSessionsPanel } from "./OtherSessionsPanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { MAX_TERMINAL_WIDTH, MIN_TERMINAL_WIDTH, DEFAULT_FALLBACK_WIDTH } from "./constants.js";
+import { useCountdown } from "./hooks/useCountdown.js";
+import { useVisualFeedback } from "./hooks/useVisualFeedback.js";
+import { useHotkeys } from "./hooks/useHotkeys.js";
 import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
 import { getTestData } from "../data/tests.js";
 import { getProjectData, type ProjectData } from "../data/project.js";
@@ -15,100 +18,13 @@ import { getClaudeData } from "../data/claude.js";
 import { getOtherSessionsData, type OtherSessionsData } from "../data/otherSessions.js";
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
-import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
+import { parseConfig } from "../config/parser.js";
 import { getVersion } from "../cli.js";
-import type { TestData, ClaudeData, GenericPanelRenderer } from "../types/index.js";
+import type { TestData, ClaudeData } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
   agentDirExists?: boolean;
-}
-
-interface PanelCountdowns {
-  project: number | null;
-  git: number | null;
-  claude: number | null;
-  other_sessions: number | null;
-  [key: string]: number | null; // custom panels
-}
-
-// Visual feedback states for panels
-interface VisualFeedback {
-  isRunning: boolean;
-  justRefreshed: boolean;
-  justCompleted: boolean;
-}
-
-interface PanelVisualStates {
-  project: VisualFeedback;
-  git: VisualFeedback;
-  tests: VisualFeedback;
-  claude: VisualFeedback;
-  other_sessions: VisualFeedback;
-  [key: string]: VisualFeedback; // custom panels
-}
-
-const DEFAULT_VISUAL_STATE: VisualFeedback = {
-  isRunning: false,
-  justRefreshed: false,
-  justCompleted: false,
-};
-
-const FEEDBACK_DURATION = 1500; // 1.5 seconds for visual feedback
-
-interface Hotkey {
-  key: string;
-  label: string;
-  action: () => void;
-}
-
-// Generate hotkeys for manual panels
-function generateHotkeys(
-  config: Config,
-  actions: {
-    tests?: () => void;
-    customPanels?: Record<string, () => void>;
-  }
-): Hotkey[] {
-  const hotkeys: Hotkey[] = [];
-  const usedKeys = new Set<string>(["r", "q"]); // reserved
-
-  // Tests panel - manual by default
-  if (config.panels.tests.enabled && config.panels.tests.interval === null && actions.tests) {
-    const name = "tests";
-    for (const char of name.toLowerCase()) {
-      if (!usedKeys.has(char)) {
-        usedKeys.add(char);
-        hotkeys.push({
-          key: char,
-          label: "run tests",
-          action: actions.tests,
-        });
-        break;
-      }
-    }
-  }
-
-  // Custom panels with manual interval
-  if (config.customPanels && actions.customPanels) {
-    for (const [name, panelConfig] of Object.entries(config.customPanels)) {
-      if (panelConfig.enabled && panelConfig.interval === null && actions.customPanels[name]) {
-        for (const char of name.toLowerCase()) {
-          if (!usedKeys.has(char)) {
-            usedKeys.add(char);
-            hotkeys.push({
-              key: char,
-              label: `run ${name}`,
-              action: actions.customPanels[name],
-            });
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  return hotkeys;
 }
 
 function formatRelativeTime(timestamp: string): string {
@@ -137,7 +53,6 @@ function WelcomeApp(): React.ReactElement {
   return <WelcomePanel />;
 }
 
-// Calculate capped terminal width
 function getClampedWidth(columns: number | undefined): number {
   if (!columns || columns <= 0) {
     return DEFAULT_FALLBACK_WIDTH;
@@ -148,71 +63,88 @@ function getClampedWidth(columns: number | undefined): number {
 function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const isWatchMode = mode === "watch";
 
   // Parse config once at startup
   const { config, warnings } = useMemo(() => parseConfig(), []);
 
-  // Width priority: config.width > terminal width (clamped)
-  const getEffectiveWidth = (terminalColumns: number | undefined): number => {
-    // If config specifies width, use it (already validated in parser)
-    if (config.width) {
-      return config.width;
-    }
-    // Otherwise use terminal width with clamping
-    return getClampedWidth(terminalColumns);
-  };
+  // Width management
+  const getEffectiveWidth = useCallback(
+    (terminalColumns: number | undefined): number => {
+      if (config.width) return config.width;
+      return getClampedWidth(terminalColumns);
+    },
+    [config.width]
+  );
 
-  // Responsive terminal width using Ink's useStdout hook
   const [width, setWidth] = useState(() => getEffectiveWidth(stdout?.columns));
 
   useEffect(() => {
-    // Update width when stdout columns change (only if not using config width)
     if (!config.width) {
       const newWidth = getEffectiveWidth(stdout?.columns);
-      if (newWidth !== width) {
-        setWidth(newWidth);
-      }
+      if (newWidth !== width) setWidth(newWidth);
     }
-  }, [stdout?.columns, width, config.width]);
+  }, [stdout?.columns, width, config.width, getEffectiveWidth]);
 
   useEffect(() => {
-    // Only listen for resize if not using fixed config width
     if (config.width) return;
-
-    const handleResize = () => {
-      setWidth(getEffectiveWidth(stdout?.columns));
-    };
-
-    // Listen for terminal resize events
+    const handleResize = () => setWidth(getEffectiveWidth(stdout?.columns));
     stdout?.on("resize", handleResize);
+    return () => { stdout?.off("resize", handleResize); };
+  }, [stdout, config.width, getEffectiveWidth]);
 
-    return () => {
-      stdout?.off("resize", handleResize);
+  // Panel names for hooks
+  const customPanelNames = useMemo(
+    () => Object.keys(config.customPanels || {}),
+    [config.customPanels]
+  );
+
+  const allPanelNames = useMemo(
+    () => ["project", "git", "tests", "claude", "other_sessions", ...customPanelNames],
+    [customPanelNames]
+  );
+
+  // Build panel intervals for useCountdown
+  const panelIntervals = useMemo(() => {
+    const panels: Record<string, { interval: number | null }> = {
+      project: { interval: config.panels.project.interval },
+      git: { interval: config.panels.git.interval },
+      tests: { interval: config.panels.tests.interval },
+      claude: { interval: config.panels.claude.interval },
+      other_sessions: { interval: config.panels.other_sessions.interval },
     };
-  }, [stdout, config.width]);
+    const customPanels: Record<string, { interval: number | null }> = {};
+    if (config.customPanels) {
+      for (const [name, cfg] of Object.entries(config.customPanels)) {
+        customPanels[name] = { interval: cfg.interval };
+      }
+    }
+    return { panels, customPanels };
+  }, [config]);
 
-  // Calculate interval in seconds for display
-  const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
-  const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
-  const claudeIntervalSeconds = config.panels.claude.interval ? config.panels.claude.interval / 1000 : null;
-  const otherSessionsIntervalSeconds = config.panels.other_sessions.interval ? config.panels.other_sessions.interval / 1000 : null;
+  // Use extracted hooks
+  const { countdowns, reset: resetCountdown } = useCountdown({
+    panels: panelIntervals.panels,
+    customPanels: panelIntervals.customPanels,
+    enabled: isWatchMode,
+  });
 
-  // Get current working directory for Claude session lookup
+  const visualFeedback = useVisualFeedback({ panels: allPanelNames });
+
+  // Current working directory
   const cwd = process.cwd();
 
-  // Project data
+  // Panel data states
   const [projectData, setProjectData] = useState<ProjectData>(() => getProjectData());
-  const refreshProject = useCallback(() => {
-    setProjectData(getProjectData());
-  }, []);
-
-  // Git data - uses config commands
   const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
-  const refreshGit = useCallback(() => {
-    setGitData(getGitData(config.panels.git));
-  }, [config.panels.git]);
+  const [claudeData, setClaudeData] = useState<ClaudeData>(() =>
+    getClaudeData(cwd, config.panels.claude.maxActivities)
+  );
+  const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(() =>
+    getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
+  );
 
-  // Test data - uses config command or falls back to file
+  // Test data with disabled state
   const getTestDataFromConfig = useCallback((): TestData => {
     if (config.panels.tests.command) {
       return runTestCommand(config.panels.tests.command);
@@ -220,43 +152,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return getTestData();
   }, [config.panels.tests.command]);
 
-  // Compute initial test data and disabled state together (avoid setState in useState)
   const initialTestData = useMemo(() => getTestDataFromConfig(), [getTestDataFromConfig]);
-  const initialTestsDisabled = !!(initialTestData.error && config.panels.tests.command);
-
-  // Track if tests panel should be disabled due to command errors
-  const [testsDisabled, setTestsDisabled] = useState(initialTestsDisabled);
+  const [testsDisabled, setTestsDisabled] = useState(
+    !!(initialTestData.error && config.panels.tests.command)
+  );
   const [testData, setTestData] = useState<TestData>(initialTestData);
 
-  const refreshTest = useCallback(() => {
-    const data = getTestDataFromConfig();
-    // Disable panel if command fails, re-enable if it succeeds
-    if (config.panels.tests.command) {
-      setTestsDisabled(!!data.error);
-    }
-    setTestData(data);
-  }, [getTestDataFromConfig, config.panels.tests.command]);
-
-  // Claude data
-  const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd, config.panels.claude.maxActivities));
-  const refreshClaude = useCallback(() => {
-    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
-  }, [cwd, config.panels.claude.maxActivities]);
-
-  // Other sessions data
-  const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(() =>
-    getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
-  );
-  const refreshOtherSessions = useCallback(() => {
-    setOtherSessionsData(getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold }));
-  }, [cwd, config.panels.other_sessions.activeThreshold]);
-
   // Custom panel data
-  const customPanelNames = useMemo(
-    () => Object.keys(config.customPanels || {}),
-    [config.customPanels]
-  );
-
   const [customPanelData, setCustomPanelData] = useState<Record<string, CustomPanelResult>>(() => {
     const data: Record<string, CustomPanelResult> = {};
     if (config.customPanels) {
@@ -269,116 +171,30 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return data;
   });
 
-  const refreshCustomPanel = useCallback(
-    (name: string) => {
-      if (config.customPanels && config.customPanels[name]) {
-        setCustomPanelData((prev) => ({
-          ...prev,
-          [name]: getCustomPanelData(name, config.customPanels![name]),
-        }));
-      }
-    },
-    [config.customPanels]
-  );
-
-  // Per-panel countdowns
-  const initialCountdowns = useMemo(() => {
-    const countdowns: PanelCountdowns = {
-      project: projectIntervalSeconds,
-      git: gitIntervalSeconds,
-      claude: claudeIntervalSeconds,
-      other_sessions: otherSessionsIntervalSeconds,
-    };
-    if (config.customPanels) {
-      for (const [name, panelConfig] of Object.entries(config.customPanels)) {
-        countdowns[name] = panelConfig.interval ? panelConfig.interval / 1000 : null;
-      }
-    }
-    return countdowns;
-  }, [projectIntervalSeconds, gitIntervalSeconds, claudeIntervalSeconds, otherSessionsIntervalSeconds, config.customPanels]);
-
-  const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
-
-  // Visual feedback states
-  const initialVisualStates = useMemo(() => {
-    const states: PanelVisualStates = {
-      project: { ...DEFAULT_VISUAL_STATE },
-      git: { ...DEFAULT_VISUAL_STATE },
-      tests: { ...DEFAULT_VISUAL_STATE },
-      claude: { ...DEFAULT_VISUAL_STATE },
-      other_sessions: { ...DEFAULT_VISUAL_STATE },
-    };
-    for (const name of customPanelNames) {
-      states[name] = { ...DEFAULT_VISUAL_STATE };
-    }
-    return states;
-  }, [customPanelNames]);
-
-  const [visualStates, setVisualStates] = useState<PanelVisualStates>(initialVisualStates);
-
-  // Helper to set visual state for a panel
-  const setVisualState = useCallback((panel: string, update: Partial<VisualFeedback>) => {
-    setVisualStates((prev) => ({
-      ...prev,
-      [panel]: { ...prev[panel], ...update },
-    }));
-  }, []);
-
-  // Helper to clear visual feedback after duration
-  const clearFeedback = useCallback((panel: string, key: keyof VisualFeedback) => {
-    setTimeout(() => {
-      setVisualState(panel, { [key]: false });
-    }, FEEDBACK_DURATION);
-  }, [setVisualState]);
-
-  // Project panel refresh with visual feedback (sync, no async version needed)
-  const refreshProjectWithFeedback = useCallback(() => {
+  // Refresh functions with visual feedback
+  const refreshProject = useCallback(() => {
     setProjectData(getProjectData());
-    setVisualState("project", { justRefreshed: true });
-    clearFeedback("project", "justRefreshed");
-  }, [setVisualState, clearFeedback]);
+    visualFeedback.setRefreshed("project");
+    resetCountdown("project");
+  }, [visualFeedback, resetCountdown]);
 
-  // Async refresh for Git with visual feedback
   const refreshGitAsync = useCallback(async () => {
-    setVisualState("git", { isRunning: true });
+    visualFeedback.startAsync("git");
     try {
       const data = await getGitDataAsync(config.panels.git);
       setGitData(data);
     } finally {
-      setVisualState("git", { isRunning: false, justRefreshed: true });
-      clearFeedback("git", "justRefreshed");
+      visualFeedback.endAsync("git");
+      resetCountdown("git");
     }
-  }, [config.panels.git, setVisualState, clearFeedback]);
+  }, [config.panels.git, visualFeedback, resetCountdown]);
 
-  // Async refresh for custom panels with visual feedback
-  const refreshCustomPanelAsync = useCallback(
-    async (name: string) => {
-      if (config.customPanels && config.customPanels[name]) {
-        setVisualState(name, { isRunning: true });
-        try {
-          const result = await getCustomPanelDataAsync(name, config.customPanels[name]);
-          setCustomPanelData((prev) => ({
-            ...prev,
-            [name]: result,
-          }));
-        } finally {
-          setVisualState(name, { isRunning: false, justRefreshed: true });
-          clearFeedback(name, "justRefreshed");
-        }
-      }
-    },
-    [config.customPanels, setVisualState, clearFeedback]
-  );
-
-  // Async refresh for tests with visual feedback
   const refreshTestAsync = useCallback(async () => {
-    setVisualState("tests", { isRunning: true });
+    visualFeedback.startAsync("tests");
     try {
-      // Tests still use sync for now, but wrapped in setTimeout to allow UI update
       await new Promise<void>((resolve) => {
         setTimeout(() => {
           const data = getTestDataFromConfig();
-          // Disable panel if command fails, re-enable if it succeeds
           if (config.panels.tests.command) {
             setTestsDisabled(!!data.error);
           }
@@ -387,221 +203,143 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         }, 0);
       });
     } finally {
-      setVisualState("tests", { isRunning: false, justCompleted: true });
-      clearFeedback("tests", "justCompleted");
+      visualFeedback.endAsync("tests", { completed: true });
     }
-  }, [getTestDataFromConfig, setVisualState, clearFeedback, config.panels.tests.command]);
+  }, [getTestDataFromConfig, config.panels.tests.command, visualFeedback]);
 
-  // Claude panel refresh with visual feedback (file-based)
-  const refreshClaudeWithFeedback = useCallback(() => {
+  const refreshClaude = useCallback(() => {
     setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
-    setVisualState("claude", { justRefreshed: true });
-    clearFeedback("claude", "justRefreshed");
-  }, [cwd, config.panels.claude.maxActivities, setVisualState, clearFeedback]);
+    visualFeedback.setRefreshed("claude");
+    resetCountdown("claude");
+  }, [cwd, config.panels.claude.maxActivities, visualFeedback, resetCountdown]);
 
-  // Other sessions panel refresh with visual feedback (file-based)
-  const refreshOtherSessionsWithFeedback = useCallback(() => {
-    setOtherSessionsData(getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold }));
-    setVisualState("other_sessions", { justRefreshed: true });
-    clearFeedback("other_sessions", "justRefreshed");
-  }, [cwd, config.panels.other_sessions.activeThreshold, setVisualState, clearFeedback]);
+  const refreshOtherSessions = useCallback(() => {
+    setOtherSessionsData(
+      getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
+    );
+    visualFeedback.setRefreshed("other_sessions");
+    resetCountdown("other_sessions");
+  }, [cwd, config.panels.other_sessions.activeThreshold, visualFeedback, resetCountdown]);
 
-  // Build custom panel refresh actions for hotkeys (async)
-  const customPanelActionsAsync = useMemo(() => {
-    const actions: Record<string, () => void> = {};
-    for (const name of customPanelNames) {
-      actions[name] = () => void refreshCustomPanelAsync(name);
-    }
-    return actions;
-  }, [customPanelNames, refreshCustomPanelAsync]);
+  const refreshCustomPanelAsync = useCallback(
+    async (name: string) => {
+      if (config.customPanels && config.customPanels[name]) {
+        visualFeedback.startAsync(name);
+        try {
+          const result = await getCustomPanelDataAsync(name, config.customPanels[name]);
+          setCustomPanelData((prev) => ({ ...prev, [name]: result }));
+        } finally {
+          visualFeedback.endAsync(name);
+          resetCountdown(name);
+        }
+      }
+    },
+    [config.customPanels, visualFeedback, resetCountdown]
+  );
 
-  const refreshAll = useCallback(async () => {
-    if (config.panels.project.enabled) {
-      refreshProjectWithFeedback();
-      setCountdowns((prev) => ({ ...prev, project: projectIntervalSeconds }));
-    }
-    if (config.panels.git.enabled) {
-      void refreshGitAsync();
-      setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
-    }
-    if (config.panels.tests.enabled) {
-      void refreshTestAsync();
-    }
-    if (config.panels.claude.enabled) {
-      refreshClaudeWithFeedback();
-      setCountdowns((prev) => ({ ...prev, claude: claudeIntervalSeconds }));
-    }
-    if (config.panels.other_sessions.enabled) {
-      refreshOtherSessionsWithFeedback();
-      setCountdowns((prev) => ({ ...prev, other_sessions: otherSessionsIntervalSeconds }));
-    }
-    // Refresh custom panels
+  // Refresh all panels
+  const refreshAll = useCallback(() => {
+    if (config.panels.project.enabled) refreshProject();
+    if (config.panels.git.enabled) void refreshGitAsync();
+    if (config.panels.tests.enabled) void refreshTestAsync();
+    if (config.panels.claude.enabled) refreshClaude();
+    if (config.panels.other_sessions.enabled) refreshOtherSessions();
     for (const name of customPanelNames) {
       if (config.customPanels![name].enabled) {
         void refreshCustomPanelAsync(name);
-        const interval = config.customPanels![name].interval;
-        setCountdowns((prev) => ({
-          ...prev,
-          [name]: interval ? interval / 1000 : null,
-        }));
       }
     }
   }, [
-    refreshProjectWithFeedback,
+    config,
+    customPanelNames,
+    refreshProject,
     refreshGitAsync,
     refreshTestAsync,
-    refreshClaudeWithFeedback,
-    refreshOtherSessionsWithFeedback,
+    refreshClaude,
+    refreshOtherSessions,
     refreshCustomPanelAsync,
-    config,
-    projectIntervalSeconds,
-    gitIntervalSeconds,
-    claudeIntervalSeconds,
-    otherSessionsIntervalSeconds,
-    customPanelNames,
   ]);
 
-  // Generate hotkeys for manual panels (using async functions)
-  const hotkeys = useMemo(
-    () => generateHotkeys(config, {
-      tests: () => void refreshTestAsync(),
-      customPanels: customPanelActionsAsync
-    }),
-    [config, refreshTestAsync, customPanelActionsAsync]
+  // Build manual panels for hotkeys
+  const manualPanels = useMemo(() => {
+    const panels: Array<{ name: string; label: string; action: () => void }> = [];
+
+    if (config.panels.tests.enabled && config.panels.tests.interval === null) {
+      panels.push({ name: "tests", label: "run tests", action: () => void refreshTestAsync() });
+    }
+
+    if (config.customPanels) {
+      for (const [name, panelConfig] of Object.entries(config.customPanels)) {
+        if (panelConfig.enabled && panelConfig.interval === null) {
+          panels.push({
+            name,
+            label: `run ${name}`,
+            action: () => void refreshCustomPanelAsync(name),
+          });
+        }
+      }
+    }
+
+    return panels;
+  }, [config, refreshTestAsync, refreshCustomPanelAsync]);
+
+  // Use hotkeys hook
+  const { handleInput, statusBarItems } = useHotkeys({
+    manualPanels,
+    onRefreshAll: refreshAll,
+    onQuit: exit,
+  });
+
+  // Keyboard input handling
+  useInput(
+    (input) => {
+      handleInput(input);
+    },
+    { isActive: isWatchMode }
   );
 
-  // Per-panel refresh timers (using async functions with visual feedback)
+  // Per-panel refresh timers
   useEffect(() => {
-    if (mode !== "watch") return;
+    if (!isWatchMode) return;
 
     const timers: NodeJS.Timeout[] = [];
 
-    // Project panel timer
     if (config.panels.project.enabled && config.panels.project.interval !== null) {
-      timers.push(
-        setInterval(() => {
-          refreshProjectWithFeedback();
-          setCountdowns((prev) => ({ ...prev, project: projectIntervalSeconds }));
-        }, config.panels.project.interval)
-      );
+      timers.push(setInterval(refreshProject, config.panels.project.interval));
     }
-
-    // Git panel timer
     if (config.panels.git.enabled && config.panels.git.interval !== null) {
-      timers.push(
-        setInterval(() => {
-          void refreshGitAsync();
-          setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
-        }, config.panels.git.interval)
-      );
+      timers.push(setInterval(() => void refreshGitAsync(), config.panels.git.interval));
     }
-
-    // Tests panel timer (null = manual, no timer)
     if (config.panels.tests.enabled && config.panels.tests.interval !== null) {
       timers.push(setInterval(() => void refreshTestAsync(), config.panels.tests.interval));
     }
-
-    // Claude panel timer
     if (config.panels.claude.enabled && config.panels.claude.interval !== null) {
-      timers.push(
-        setInterval(() => {
-          refreshClaudeWithFeedback();
-          setCountdowns((prev) => ({ ...prev, claude: claudeIntervalSeconds }));
-        }, config.panels.claude.interval)
-      );
+      timers.push(setInterval(refreshClaude, config.panels.claude.interval));
     }
-
-    // Other sessions panel timer
     if (config.panels.other_sessions.enabled && config.panels.other_sessions.interval !== null) {
-      timers.push(
-        setInterval(() => {
-          refreshOtherSessionsWithFeedback();
-          setCountdowns((prev) => ({ ...prev, other_sessions: otherSessionsIntervalSeconds }));
-        }, config.panels.other_sessions.interval)
-      );
+      timers.push(setInterval(refreshOtherSessions, config.panels.other_sessions.interval));
     }
-
-    // Custom panel timers
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
         if (panelConfig.enabled && panelConfig.interval !== null) {
-          const intervalSeconds = panelConfig.interval / 1000;
-          timers.push(
-            setInterval(() => {
-              void refreshCustomPanelAsync(name);
-              setCountdowns((prev) => ({ ...prev, [name]: intervalSeconds }));
-            }, panelConfig.interval)
-          );
+          timers.push(setInterval(() => void refreshCustomPanelAsync(name), panelConfig.interval));
         }
       }
     }
 
     return () => timers.forEach((t) => clearInterval(t));
   }, [
-    mode,
+    isWatchMode,
     config,
-    refreshProjectWithFeedback,
+    refreshProject,
     refreshGitAsync,
     refreshTestAsync,
-    refreshClaudeWithFeedback,
-    refreshOtherSessionsWithFeedback,
+    refreshClaude,
+    refreshOtherSessions,
     refreshCustomPanelAsync,
-    projectIntervalSeconds,
-    gitIntervalSeconds,
-    claudeIntervalSeconds,
-    otherSessionsIntervalSeconds,
   ]);
 
-  // Countdown ticker - decrements every second
-  useEffect(() => {
-    if (mode !== "watch") return;
-
-    const tick = setInterval(() => {
-      setCountdowns((prev) => {
-        const next: PanelCountdowns = {
-          project: prev.project !== null && prev.project > 1 ? prev.project - 1 : prev.project,
-          git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
-          claude: prev.claude !== null && prev.claude > 1 ? prev.claude - 1 : prev.claude,
-          other_sessions: prev.other_sessions !== null && prev.other_sessions > 1 ? prev.other_sessions - 1 : prev.other_sessions,
-        };
-        // Decrement custom panel countdowns
-        for (const name of customPanelNames) {
-          next[name] = prev[name] !== null && prev[name]! > 1 ? prev[name]! - 1 : prev[name];
-        }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [mode, customPanelNames]);
-
-  // Keyboard shortcuts
-  useInput(
-    (input) => {
-      if (input === "q") {
-        exit();
-      }
-      if (input === "r") {
-        refreshAll();
-      }
-      // Handle dynamic hotkeys
-      for (const hotkey of hotkeys) {
-        if (input === hotkey.key) {
-          hotkey.action();
-          break;
-        }
-      }
-    },
-    { isActive: mode === "watch" }
-  );
-
-  // Build status bar content
-  const statusBarItems: string[] = [];
-  for (const hotkey of hotkeys) {
-    statusBarItems.push(`${hotkey.key}: ${hotkey.label}`);
-  }
-  statusBarItems.push("r: refresh all");
-  statusBarItems.push("q: quit");
-
+  // Render panels
   return (
     <Box flexDirection="column">
       {warnings.length > 0 && (
@@ -609,86 +347,83 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           <Text color="yellow">⚠ {warnings.join(", ")}</Text>
         </Box>
       )}
+
       {config.panelOrder.map((panelName, index) => {
         const isFirst = index === 0;
+        const marginTop = isFirst ? 0 : 1;
 
-        // Project panel
         if (panelName === "project" && config.panels.project.enabled) {
-          const projectVisual = visualStates.project || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState("project");
           return (
-            <Box key={`panel-project-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <ProjectPanel
                 data={projectData}
-                countdown={mode === "watch" ? countdowns.project : null}
+                countdown={isWatchMode ? countdowns.project : null}
                 width={width}
-                justRefreshed={projectVisual.justRefreshed}
+                justRefreshed={vs.justRefreshed}
               />
             </Box>
           );
         }
 
-        // Git panel
         if (panelName === "git" && config.panels.git.enabled) {
-          const gitVisual = visualStates.git || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState("git");
           return (
-            <Box key={`panel-git-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <GitPanel
                 branch={gitData.branch}
                 commits={gitData.commits}
                 stats={gitData.stats}
                 uncommitted={gitData.uncommitted}
-                countdown={mode === "watch" ? countdowns.git : null}
+                countdown={isWatchMode ? countdowns.git : null}
                 width={width}
-                isRunning={gitVisual.isRunning}
-                justRefreshed={gitVisual.justRefreshed}
+                isRunning={vs.isRunning}
+                justRefreshed={vs.justRefreshed}
               />
             </Box>
           );
         }
 
-        // Tests panel (skip if disabled due to command error)
         if (panelName === "tests" && config.panels.tests.enabled && !testsDisabled) {
-          const testsVisual = visualStates.tests || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState("tests");
           return (
-            <Box key={`panel-tests-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <TestPanel
                 results={testData.results}
                 isOutdated={testData.isOutdated}
                 commitsBehind={testData.commitsBehind}
                 error={testData.error}
                 width={width}
-                isRunning={testsVisual.isRunning}
-                justCompleted={testsVisual.justCompleted}
+                isRunning={vs.isRunning}
+                justCompleted={vs.justCompleted}
               />
             </Box>
           );
         }
 
-        // Claude panel
         if (panelName === "claude" && config.panels.claude.enabled) {
-          const claudeVisual = visualStates.claude || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState("claude");
           return (
-            <Box key={`panel-claude-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <ClaudePanel
                 data={claudeData}
-                countdown={mode === "watch" ? countdowns.claude : null}
+                countdown={isWatchMode ? countdowns.claude : null}
                 width={width}
-                justRefreshed={claudeVisual.justRefreshed}
+                justRefreshed={vs.justRefreshed}
               />
             </Box>
           );
         }
 
-        // Other sessions panel
         if (panelName === "other_sessions" && config.panels.other_sessions.enabled) {
-          const otherSessionsVisual = visualStates.other_sessions || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState("other_sessions");
           return (
-            <Box key={`panel-other_sessions-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <OtherSessionsPanel
                 data={otherSessionsData}
-                countdown={mode === "watch" ? countdowns.other_sessions : null}
+                countdown={isWatchMode ? countdowns.other_sessions : null}
                 width={width}
-                isRunning={otherSessionsVisual.isRunning}
+                isRunning={vs.isRunning}
                 messageMaxLength={config.panels.other_sessions.messageMaxLength}
               />
             </Box>
@@ -701,13 +436,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           const result = customPanelData[panelName];
           if (!result) return null;
 
-          const customVisual = visualStates[panelName] || DEFAULT_VISUAL_STATE;
+          const vs = visualFeedback.getState(panelName);
           const isManual = customConfig.interval === null;
           const relativeTime = isManual ? formatRelativeTime(result.timestamp) : undefined;
-          const countdown = !isManual && mode === "watch" ? countdowns[panelName] : null;
+          const countdown = !isManual && isWatchMode ? countdowns[panelName] : null;
 
           return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
               <GenericPanel
                 data={result.data}
                 renderer={customConfig.renderer}
@@ -715,8 +450,8 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 relativeTime={relativeTime}
                 error={result.error}
                 width={width}
-                isRunning={customVisual.isRunning}
-                justRefreshed={customVisual.justRefreshed}
+                isRunning={vs.isRunning}
+                justRefreshed={vs.justRefreshed}
               />
             </Box>
           );
@@ -724,7 +459,8 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
         return null;
       })}
-      {mode === "watch" && (
+
+      {isWatchMode && (
         <Box marginTop={1} width={width} justifyContent="space-between">
           <Text dimColor>
             {statusBarItems.map((item, index) => (
