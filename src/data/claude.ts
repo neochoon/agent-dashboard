@@ -360,7 +360,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
 
   // Add subagent tokens if subagents folder exists
   // Subagents folder path: {session-file-without-.jsonl}/subagents/
-  const subagentsDir = sessionFile.replace(/\.jsonl$/, "") + "/subagents";
+  const subagentsDir = join(sessionFile.replace(/\.jsonl$/, ""), "subagents");
   if (fs.existsSync(subagentsDir)) {
     try {
       const subagentFiles = fs.readdirSync(subagentsDir).filter((f) => f.endsWith(".jsonl"));
