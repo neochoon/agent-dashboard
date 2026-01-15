@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 interface PanelInterval {
   interval: number | null; // ms, null = manual
@@ -63,6 +63,10 @@ export function useCountdown({
 
   const [countdowns, setCountdowns] = useState<Record<string, number | null>>(initialCountdowns);
 
+  // Keep ref to latest intervalSeconds to avoid stale closures
+  const intervalSecondsRef = useRef(intervalSeconds);
+  intervalSecondsRef.current = intervalSeconds;
+
   // Tick every second when enabled
   useEffect(() => {
     if (!enabled) return;
@@ -92,18 +96,15 @@ export function useCountdown({
   }, [enabled]);
 
   // Reset single panel countdown
-  const reset = useCallback(
-    (panelName: string) => {
-      const interval = intervalSeconds[panelName];
-      if (interval === null || interval === undefined) return;
+  const reset = useCallback((panelName: string) => {
+    const interval = intervalSecondsRef.current[panelName];
+    if (interval === null || interval === undefined) return;
 
-      setCountdowns((prev) => ({
-        ...prev,
-        [panelName]: interval,
-      }));
-    },
-    [intervalSeconds]
-  );
+    setCountdowns((prev) => ({
+      ...prev,
+      [panelName]: interval,
+    }));
+  }, []);
 
   // Reset all panel countdowns
   const resetAll = useCallback(() => {
@@ -111,13 +112,13 @@ export function useCountdown({
       const next: Record<string, number | null> = {};
 
       for (const name of Object.keys(prev)) {
-        const interval = intervalSeconds[name];
+        const interval = intervalSecondsRef.current[name];
         next[name] = interval ?? prev[name];
       }
 
       return next;
     });
-  }, [intervalSeconds]);
+  }, []);
 
   return {
     countdowns,
