@@ -910,6 +910,270 @@ describe("claude data module", () => {
       expect(result.activities[0].detail).toBe("npm test");
     });
 
+    it("includes subActivities for Task when subagent file exists", () => {
+      const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+      const subagentsDir = join("/fake", "session", "subagents");
+      const subagentFile = join(subagentsDir, "agent-abc123.jsonl");
+
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Task",
+                input: {
+                  description: "Explore codebase",
+                  subagent_type: "Explore",
+                },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      const subagentLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Read",
+                input: { file_path: "src/app.ts" },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Grep",
+                input: { pattern: "handleError" },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
+        if (String(path) === subagentsDir) return true;
+        return false;
+      });
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return mainSessionLines;
+        if (String(path) === subagentFile) return subagentLines;
+        return "";
+      });
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path) === subagentsDir) return ["agent-abc123.jsonl"] as any;
+        return [] as any;
+      });
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path) === subagentFile) {
+          return { mtimeMs: now.getTime() } as any;
+        }
+        return { mtimeMs: 0 } as any;
+      });
+
+      const result = parseSessionState(sessionFile);
+
+      expect(result.activities[0].label).toBe("Task");
+      expect(result.activities[0].subActivities).toBeDefined();
+      expect(result.activities[0].subActivities!.length).toBe(2);
+      expect(result.activities[0].subActivities![0].label).toBe("Read");
+      expect(result.activities[0].subActivities![1].label).toBe("Grep");
+    });
+
+    it("limits subActivities to 3 most recent", () => {
+      const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+      const subagentsDir = join("/fake", "session", "subagents");
+      const subagentFile = join(subagentsDir, "agent-abc123.jsonl");
+
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Task",
+                input: { description: "Explore codebase" },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      // 5 subagent activities
+      const subagentLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Read",
+                input: { file_path: "file1.ts" },
+              },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 5000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Read",
+                input: { file_path: "file2.ts" },
+              },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 4000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Grep", input: { pattern: "test1" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 3000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Grep", input: { pattern: "test2" } },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 2000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "app.ts" },
+              },
+            ],
+          },
+          timestamp: new Date(now.getTime() - 1000).toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
+        if (String(path) === subagentsDir) return true;
+        return false;
+      });
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return mainSessionLines;
+        if (String(path) === subagentFile) return subagentLines;
+        return "";
+      });
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path) === subagentsDir) return ["agent-abc123.jsonl"] as any;
+        return [] as any;
+      });
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path) === subagentFile) {
+          return { mtimeMs: now.getTime() } as any;
+        }
+        return { mtimeMs: 0 } as any;
+      });
+
+      const result = parseSessionState(sessionFile);
+
+      // Should have only 3 most recent (Edit, Grep test2, Grep test1)
+      expect(result.activities[0].subActivities!.length).toBe(3);
+      expect(result.activities[0].subActivities![0].label).toBe("Edit");
+      expect(result.activities[0].subActivities![1].label).toBe("Grep");
+      expect(result.activities[0].subActivities![2].label).toBe("Grep");
+    });
+
+    it("includes subActivityCount for total subagent activities", () => {
+      const now = new Date();
+      const sessionFile = join("/fake", "session.jsonl");
+      const subagentsDir = join("/fake", "session", "subagents");
+      const subagentFile = join(subagentsDir, "agent-abc123.jsonl");
+
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Task",
+                input: { description: "Explore codebase" },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      // 5 subagent activities
+      const subagentLines = Array.from({ length: 5 }, (_, i) =>
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Read",
+                input: { file_path: `file${i}.ts` },
+              },
+            ],
+          },
+          timestamp: new Date(now.getTime() - i * 1000).toISOString(),
+        }),
+      ).join("\n");
+
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
+        if (String(path) === subagentsDir) return true;
+        return false;
+      });
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return mainSessionLines;
+        if (String(path) === subagentFile) return subagentLines;
+        return "";
+      });
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path) === subagentsDir) return ["agent-abc123.jsonl"] as any;
+        return [] as any;
+      });
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path) === subagentFile) {
+          return { mtimeMs: now.getTime() } as any;
+        }
+        return { mtimeMs: 0 } as any;
+      });
+
+      const result = parseSessionState(sessionFile);
+
+      // subActivities limited to 3, but count should be 5
+      expect(result.activities[0].subActivities!.length).toBe(3);
+      expect(result.activities[0].subActivityCount).toBe(5);
+    });
+
     it("parses todos from toolUseResult in user entry", () => {
       const now = new Date();
       const lines = [

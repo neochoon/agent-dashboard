@@ -101,6 +101,8 @@ export interface ActivityEntry {
   label: string;
   detail: string;
   count?: number; // For aggregating consecutive same activities
+  subActivities?: ActivityEntry[]; // For Task tool: subagent activities (max 3)
+  subActivityCount?: number; // Total count of subagent activities
 }
 
 export interface TodoItem {
