@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.6.4] - 2025-01-16
+
+### New
+- **Biome Linting** - Added Biome for linting and formatting (`npm run lint`)
+- **Session Time Display** - Shows session start time with elapsed duration (e.g., `17:23 (4h 32m)`)
+- **M Notation for Tokens** - Large token counts shown as `24.8M tokens` instead of `24774K`
+
+### Fixed
+- Task icon `▶` breaking panel border (changed to `»` for consistent width)
+- Title line width calculation using `getDisplayWidth` consistently
+
+### Improved
+- **Faster Initial Render** - Test data loads lazily after first paint
+- Elapsed time >= 10h omits minutes (e.g., `20h` instead of `20h 52m`)
+- All imports now use `node:` protocol
+
 ## [0.6.3] - 2025-01-16
 
 ### New
