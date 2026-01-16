@@ -1,8 +1,8 @@
 import {
-  existsSync as nodeExistsSync,
-  readFileSync as nodeReadFileSync,
-  readdirSync as nodeReaddirSync,
-  statSync as nodeStatSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
 } from "fs";
 import { homedir } from "os";
 import { join, basename } from "path";
@@ -18,33 +18,6 @@ import { THIRTY_SECONDS_MS } from "../ui/constants.js";
 
 // Re-export types for backwards compatibility
 export type { ClaudeSessionStatus, ActivityEntry, TodoItem, ClaudeSessionState, ClaudeData };
-
-export interface FsMock {
-  existsSync: (path: string) => boolean;
-  readFileSync: (path: string) => string;
-  readdirSync: (path: string) => string[];
-  statSync: (path: string) => { mtimeMs: number; size: number };
-}
-
-let fs: FsMock = {
-  existsSync: nodeExistsSync,
-  readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-  readdirSync: (path: string) => nodeReaddirSync(path) as string[],
-  statSync: nodeStatSync,
-};
-
-export function setFsMock(mock: FsMock): void {
-  fs = mock;
-}
-
-export function resetFsMock(): void {
-  fs = {
-    existsSync: nodeExistsSync,
-    readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-    readdirSync: (path: string) => nodeReaddirSync(path) as string[],
-    statSync: nodeStatSync,
-  };
-}
 
 interface JsonlUserEntry {
   type: "user";
@@ -104,11 +77,11 @@ export function getClaudeSessionPath(projectPath: string): string {
  * When multiple files have the same mtime, prefer the larger file (more content = likely active)
  */
 export function findActiveSession(sessionDir: string, sessionTimeout: number): string | null {
-  if (!fs.existsSync(sessionDir)) {
+  if (!existsSync(sessionDir)) {
     return null;
   }
 
-  const files = fs.readdirSync(sessionDir);
+  const files = readdirSync(sessionDir) as string[];
   const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
 
   if (jsonlFiles.length === 0) {
@@ -121,7 +94,7 @@ export function findActiveSession(sessionDir: string, sessionTimeout: number): s
 
   for (const file of jsonlFiles) {
     const filePath = join(sessionDir, file);
-    const stat = fs.statSync(filePath);
+    const stat = statSync(filePath);
     // Prefer newer files, or larger files when mtime is equal
     if (stat.mtimeMs > latestMtime || (stat.mtimeMs === latestMtime && stat.size > latestSize)) {
       latestMtime = stat.mtimeMs;
@@ -172,13 +145,13 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     todos: null,
   };
 
-  if (!fs.existsSync(sessionFile)) {
+  if (!existsSync(sessionFile)) {
     return defaultState;
   }
 
   let content: string;
   try {
-    content = fs.readFileSync(sessionFile);
+    content = readFileSync(sessionFile, "utf-8");
   } catch {
     return defaultState;
   }
@@ -361,13 +334,13 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
   // Add subagent tokens if subagents folder exists
   // Subagents folder path: {session-file-without-.jsonl}/subagents/
   const subagentsDir = join(sessionFile.replace(/\.jsonl$/, ""), "subagents");
-  if (fs.existsSync(subagentsDir)) {
+  if (existsSync(subagentsDir)) {
     try {
-      const subagentFiles = fs.readdirSync(subagentsDir).filter((f) => f.endsWith(".jsonl"));
+      const subagentFiles = (readdirSync(subagentsDir) as string[]).filter((f) => f.endsWith(".jsonl"));
       for (const file of subagentFiles) {
         const filePath = join(subagentsDir, file);
         try {
-          const subContent = fs.readFileSync(filePath);
+          const subContent = readFileSync(filePath, "utf-8");
           const subLines = subContent.trim().split("\n").filter(Boolean);
           for (const line of subLines) {
             try {
@@ -422,7 +395,7 @@ export function getClaudeData(
 
   try {
     const sessionDir = getClaudeSessionPath(projectPath);
-    const hasSession = fs.existsSync(sessionDir);
+    const hasSession = existsSync(sessionDir);
     const sessionFile = findActiveSession(sessionDir, sessionTimeout);
 
     if (!sessionFile) {

@@ -1,6 +1,6 @@
 import {
-  existsSync as nodeExistsSync,
-  readFileSync as nodeReadFileSync,
+  existsSync,
+  readFileSync,
 } from "fs";
 import { parse as parseYaml } from "yaml";
 import {
@@ -8,27 +8,6 @@ import {
   MIN_TERMINAL_WIDTH,
   MAX_TERMINAL_WIDTH,
 } from "../ui/constants.js";
-
-export interface FsMock {
-  existsSync: (path: string) => boolean;
-  readFileSync: (path: string) => string;
-}
-
-let fs: FsMock = {
-  existsSync: nodeExistsSync,
-  readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-};
-
-export function setFsMock(mock: FsMock): void {
-  fs = mock;
-}
-
-export function resetFsMock(): void {
-  fs = {
-    existsSync: nodeExistsSync,
-    readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-  };
-}
 
 export interface PanelConfig {
   enabled: boolean;
@@ -176,13 +155,13 @@ export function parseConfig(): ParseResult {
   const warnings: string[] = [];
   const defaultConfig = getDefaultConfig();
 
-  if (!fs.existsSync(CONFIG_PATH)) {
+  if (!existsSync(CONFIG_PATH)) {
     return { config: defaultConfig, warnings };
   }
 
   let rawConfig: unknown;
   try {
-    const content = fs.readFileSync(CONFIG_PATH);
+    const content = readFileSync(CONFIG_PATH, "utf-8");
     rawConfig = parseYaml(content);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

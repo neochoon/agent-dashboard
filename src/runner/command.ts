@@ -1,22 +1,11 @@
-import { execSync as nodeExecSync } from "child_process";
+import { execSync } from "child_process";
+import {
+  existsSync,
+  unlinkSync,
+  readFileSync,
+} from "fs";
 import type { TestResults, TestFailure, TestData } from "../types/index.js";
-
-type ExecFn = (
-  command: string,
-  options: { encoding: string; stdio: string[] }
-) => string;
-
-let execFn: ExecFn = (command, options) =>
-  nodeExecSync(command, options as Parameters<typeof nodeExecSync>[1]) as string;
-
-export function setExecFn(fn: ExecFn): void {
-  execFn = fn;
-}
-
-export function resetExecFn(): void {
-  execFn = (command, options) =>
-    nodeExecSync(command, options as Parameters<typeof nodeExecSync>[1]) as string;
-}
+import { TEST_RESULTS_FILE } from "../data/detectTestFramework.js";
 
 interface VitestOutput {
   numPassedTests: number;
@@ -36,6 +25,88 @@ interface ParsedResults {
   failed: number;
   skipped: number;
   failures: TestFailure[];
+}
+
+export function parseJUnitXml(xml: string): ParsedResults | null {
+  try {
+    // Check if this looks like XML
+    if (!xml.includes("<testsuite") && !xml.includes("<testsuites")) {
+      return null;
+    }
+
+    let totalTests = 0;
+    let totalErrors = 0;
+    let totalFailures = 0;
+    let totalSkipped = 0;
+    const failures: TestFailure[] = [];
+
+    // Find all testsuite elements - handle both self-closing and with content
+    // Match either <testsuite ...>...</testsuite> or <testsuite ... />
+    // Use word boundary \b to avoid matching <testsuites>
+    const testsuiteMatches =
+      xml.match(/<testsuite\b[^>]*(?:\/>|>[\s\S]*?<\/testsuite>)/g) || [];
+
+    // If inside <testsuites>, we should have matches
+    // If no matches but we have <testsuite, treat the whole XML as the suite
+    const testsuites =
+      testsuiteMatches.length > 0 ? testsuiteMatches : [xml];
+
+    for (const suite of testsuites) {
+      // Extract attributes from testsuite tag
+      const suiteTag = suite.match(/<testsuite[^>]*>/)?.[0] || "";
+
+      const testsMatch = suiteTag.match(/tests="(\d+)"/);
+      const errorsMatch = suiteTag.match(/errors="(\d+)"/);
+      const failuresMatch = suiteTag.match(/failures="(\d+)"/);
+      const skippedMatch = suiteTag.match(/skipped="(\d+)"/);
+
+      totalTests += testsMatch ? parseInt(testsMatch[1], 10) : 0;
+      totalErrors += errorsMatch ? parseInt(errorsMatch[1], 10) : 0;
+      totalFailures += failuresMatch ? parseInt(failuresMatch[1], 10) : 0;
+      totalSkipped += skippedMatch ? parseInt(skippedMatch[1], 10) : 0;
+
+      // Find testcases with failures or errors
+      // Handle both <testcase ...>...</testcase> and <testcase ... /> (self-closing)
+      // Use [^/>]* before (?:\/>) to avoid consuming the / in self-closing tags
+      const testcaseRegex =
+        /<testcase[^>]*classname="([^"]*)"[^>]*name="([^"]*)"[^/>]*(?:\/>|>[\s\S]*?<\/testcase>)/g;
+      let testcaseMatch;
+
+      while ((testcaseMatch = testcaseRegex.exec(suite)) !== null) {
+        const testcaseContent = testcaseMatch[0];
+        const classname = testcaseMatch[1];
+        const name = testcaseMatch[2];
+
+        // Only self-closing testcases don't have failures
+        // Non-self-closing testcases need to check for failure/error elements
+        if (
+          testcaseContent.includes("<failure") ||
+          testcaseContent.includes("<error")
+        ) {
+          failures.push({
+            file: classname,
+            name: name,
+          });
+        }
+      }
+    }
+
+    if (totalTests === 0 && testsuiteMatches.length === 0) {
+      return null;
+    }
+
+    const failed = totalFailures + totalErrors;
+    const passed = totalTests - failed - totalSkipped;
+
+    return {
+      passed,
+      failed,
+      skipped: totalSkipped,
+      failures,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function parseVitestOutput(output: string): ParsedResults | null {
@@ -75,41 +146,68 @@ export function parseVitestOutput(output: string): ParsedResults | null {
 
 function getHeadHash(): string {
   try {
-    return execFn("git rev-parse --short HEAD", {
+    return (execSync("git rev-parse --short HEAD", {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    }) as string).trim();
   } catch {
     return "unknown";
   }
 }
 
-export function runTestCommand(command: string): TestData {
-  let output: string;
-
+export function runTestCommand(command: string, source: string = TEST_RESULTS_FILE): TestData {
+  // 1. Delete existing result file (if exists)
   try {
-    output = execFn(command, {
+    if (existsSync(source)) {
+      unlinkSync(source);
+    }
+  } catch {
+    // Ignore deletion errors
+  }
+
+  // 2. Run command (ignore exit code - test failures return non-zero)
+  try {
+    execSync(command, {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
+  } catch {
+    // Ignore exit code - check file existence instead
+  }
+
+  // 3. Check if result file was created
+  if (!existsSync(source)) {
+    return {
+      results: null,
+      isOutdated: false,
+      commitsBehind: 0,
+      error: "Test command failed to produce output file",
+    };
+  }
+
+  // 4. Read and parse the result file
+  let content: string;
+  try {
+    content = readFileSync(source, "utf-8");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       results: null,
       isOutdated: false,
       commitsBehind: 0,
-      error: message,
+      error: `Failed to read result file: ${message}`,
     };
   }
 
-  const parsed = parseVitestOutput(output);
+  // 5. Parse JUnit XML
+  const parsed = parseJUnitXml(content);
 
   if (!parsed) {
     return {
       results: null,
       isOutdated: false,
       commitsBehind: 0,
-      error: "Failed to parse test output",
+      error: "Failed to parse test results XML",
     };
   }
 

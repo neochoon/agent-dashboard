@@ -1,33 +1,10 @@
-import { execSync as nodeExecSync, exec as nodeExec } from "child_process";
-import { readFileSync as nodeReadFileSync, promises as fsPromises } from "fs";
+import { execSync, exec } from "child_process";
+import { readFileSync, promises as fsPromises } from "fs";
 import { promisify } from "util";
 import type { GenericPanelData, GenericPanelRenderer } from "../types/index.js";
 import type { CustomPanelConfig } from "../config/parser.js";
 
-const execAsync = promisify(nodeExec);
-
-// Allow mocking for tests
-let execFn: (cmd: string, options: { encoding: string }) => string = (cmd, options) =>
-  nodeExecSync(cmd, options as Parameters<typeof nodeExecSync>[1]) as string;
-
-let readFileFn: (path: string) => string = (path) => nodeReadFileSync(path, "utf-8");
-
-export function setExecFn(fn: typeof execFn): void {
-  execFn = fn;
-}
-
-export function resetExecFn(): void {
-  execFn = (cmd, options) =>
-    nodeExecSync(cmd, options as Parameters<typeof nodeExecSync>[1]) as string;
-}
-
-export function setReadFileFn(fn: typeof readFileFn): void {
-  readFileFn = fn;
-}
-
-export function resetReadFileFn(): void {
-  readFileFn = (path) => nodeReadFileSync(path, "utf-8");
-}
+const execAsync = promisify(exec);
 
 export interface CustomPanelResult {
   data: GenericPanelData;
@@ -51,7 +28,7 @@ export function getCustomPanelData(
   // Try command first
   if (panelConfig.command) {
     try {
-      const output = execFn(panelConfig.command, { encoding: "utf-8" }).trim();
+      const output = (execSync(panelConfig.command, { encoding: "utf-8" }) as string).trim();
 
       // Try to parse as JSON
       try {
@@ -90,7 +67,7 @@ export function getCustomPanelData(
   // Try source file
   if (panelConfig.source) {
     try {
-      const content = readFileFn(panelConfig.source);
+      const content = readFileSync(panelConfig.source, "utf-8");
       const parsed = JSON.parse(content);
       return {
         data: {

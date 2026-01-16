@@ -1,39 +1,12 @@
 import {
-  existsSync as nodeExistsSync,
-  readFileSync as nodeReadFileSync,
-  readdirSync as nodeReaddirSync,
-  statSync as nodeStatSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
 } from "fs";
 import { homedir } from "os";
 import { join, basename, sep } from "path";
 import { FIVE_MINUTES_MS } from "../ui/constants.js";
-
-export interface FsMock {
-  existsSync: (path: string) => boolean;
-  readFileSync: (path: string) => string;
-  readdirSync: (path: string) => string[];
-  statSync: (path: string) => { mtimeMs?: number; isDirectory?: () => boolean };
-}
-
-let fs: FsMock = {
-  existsSync: nodeExistsSync,
-  readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-  readdirSync: (path: string) => nodeReaddirSync(path) as string[],
-  statSync: nodeStatSync,
-};
-
-export function setFsMock(mock: FsMock): void {
-  fs = mock;
-}
-
-export function resetFsMock(): void {
-  fs = {
-    existsSync: nodeExistsSync,
-    readFileSync: (path: string) => nodeReadFileSync(path, "utf-8"),
-    readdirSync: (path: string) => nodeReaddirSync(path) as string[],
-    statSync: nodeStatSync,
-  };
-}
 
 const MAX_LINES_TO_SCAN = 100;
 
@@ -77,7 +50,7 @@ function decodeProjectPath(encoded: string): string {
   const naiveDecoded = encoded.replace(/-/g, sep);
 
   // If naive decode exists, use it (handles simple cases)
-  if (fs.existsSync(naiveDecoded)) {
+  if (existsSync(naiveDecoded)) {
     return naiveDecoded;
   }
 
@@ -100,9 +73,9 @@ function decodeProjectPath(encoded: string): string {
 
       // Only accept if it's a directory (not just any existing file)
       try {
-        if (fs.existsSync(testPath)) {
-          const stat = fs.statSync(testPath);
-          if (stat.isDirectory?.()) {
+        if (existsSync(testPath)) {
+          const stat = statSync(testPath);
+          if (stat.isDirectory()) {
             currentPath = testPath;
             i = j;
             found = true;
@@ -127,18 +100,18 @@ function decodeProjectPath(encoded: string): string {
 export function getAllProjects(): ProjectInfo[] {
   const projectsDir = getProjectsDir();
 
-  if (!fs.existsSync(projectsDir)) {
+  if (!existsSync(projectsDir)) {
     return [];
   }
 
-  const entries = fs.readdirSync(projectsDir);
+  const entries = readdirSync(projectsDir) as string[];
   const projects: ProjectInfo[] = [];
 
   for (const entry of entries) {
     const fullPath = join(projectsDir, entry);
     try {
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory?.()) {
+      const stat = statSync(fullPath);
+      if (stat.isDirectory()) {
         projects.push({
           encodedPath: entry,
           decodedPath: decodeProjectPath(entry),
@@ -163,13 +136,13 @@ interface JsonlAssistantEntry {
 }
 
 export function parseLastAssistantMessage(sessionFile: string): string | null {
-  if (!fs.existsSync(sessionFile)) {
+  if (!existsSync(sessionFile)) {
     return null;
   }
 
   let content: string;
   try {
-    content = fs.readFileSync(sessionFile);
+    content = readFileSync(sessionFile, "utf-8");
   } catch {
     return null;
   }
@@ -226,13 +199,13 @@ export function formatRelativeTime(date: Date): string {
 }
 
 function findMostRecentSession(projectDir: string): { file: string; mtimeMs: number } | null {
-  if (!fs.existsSync(projectDir)) {
+  if (!existsSync(projectDir)) {
     return null;
   }
 
   let files: string[];
   try {
-    files = fs.readdirSync(projectDir);
+    files = readdirSync(projectDir) as string[];
   } catch {
     return null;
   }
@@ -248,7 +221,7 @@ function findMostRecentSession(projectDir: string): { file: string; mtimeMs: num
   for (const file of jsonlFiles) {
     const filePath = join(projectDir, file);
     try {
-      const stat = fs.statSync(filePath);
+      const stat = statSync(filePath);
       if (stat.mtimeMs && stat.mtimeMs > latestMtime) {
         latestMtime = stat.mtimeMs;
         latestFile = filePath;
@@ -280,7 +253,7 @@ export function getOtherSessionsData(
     timestamp: new Date().toISOString(),
   };
 
-  if (!fs.existsSync(projectsDir)) {
+  if (!existsSync(projectsDir)) {
     return defaultResult;
   }
 

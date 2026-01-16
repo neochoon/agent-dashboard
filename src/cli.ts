@@ -29,20 +29,8 @@ export function getVersion(): string {
   return packageJson.version;
 }
 
-// Dependency injection for testing
-type ClearFn = () => void;
-let clearFn: ClearFn = () => console.clear();
-
-export function setClearFn(fn: ClearFn): void {
-  clearFn = fn;
-}
-
-export function resetClearFn(): void {
-  clearFn = () => console.clear();
-}
-
 export function clearScreen(): void {
-  clearFn();
+  console.clear();
 }
 
 export function parseArgs(args: string[]): CliOptions {

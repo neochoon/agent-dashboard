@@ -2,34 +2,7 @@ import { performance } from "perf_hooks";
 
 const DEFAULT_CLEANUP_INTERVAL = 60000; // 60 seconds
 
-interface PerformanceFunctions {
-  clearMarks: () => void;
-  clearMeasures: () => void;
-}
-
-let perfFunctions: PerformanceFunctions = {
-  clearMarks: () => performance.clearMarks(),
-  clearMeasures: () => performance.clearMeasures(),
-};
-
 let cleanupInterval: NodeJS.Timeout | null = null;
-
-/**
- * Set custom performance functions for testing.
- */
-export function setPerformanceFunctions(fns: PerformanceFunctions): void {
-  perfFunctions = fns;
-}
-
-/**
- * Reset to real performance functions.
- */
-export function resetPerformanceFunctions(): void {
-  perfFunctions = {
-    clearMarks: () => performance.clearMarks(),
-    clearMeasures: () => performance.clearMeasures(),
-  };
-}
 
 /**
  * Clear all performance marks and measures to prevent memory leaks.
@@ -37,8 +10,8 @@ export function resetPerformanceFunctions(): void {
  * that occurs when the performance entry buffer exceeds its limit.
  */
 export function clearPerformanceEntries(): void {
-  perfFunctions.clearMarks();
-  perfFunctions.clearMeasures();
+  performance.clearMarks();
+  performance.clearMeasures();
 }
 
 /**
