@@ -158,6 +158,102 @@ function getToolDetail(
   return "";
 }
 
+const MAX_SUB_ACTIVITIES = 3;
+
+interface SubagentFileInfo {
+  filePath: string;
+  mtimeMs: number;
+}
+
+/**
+ * Get sorted list of subagent files (most recent first)
+ */
+function getSubagentFiles(sessionFile: string): SubagentFileInfo[] {
+  const subagentsDir = join(sessionFile.replace(/\.jsonl$/, ""), "subagents");
+
+  if (!existsSync(subagentsDir)) {
+    return [];
+  }
+
+  try {
+    const files = (readdirSync(subagentsDir) as string[]).filter((f) =>
+      f.endsWith(".jsonl"),
+    );
+
+    const fileInfos: SubagentFileInfo[] = files.map((file) => {
+      const filePath = join(subagentsDir, file);
+      const stat = statSync(filePath);
+      return { filePath, mtimeMs: stat.mtimeMs };
+    });
+
+    // Sort by modification time descending (most recent first)
+    fileInfos.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    return fileInfos;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse activities from a single subagent file
+ */
+function parseSubagentFile(filePath: string): {
+  activities: ActivityEntry[];
+  totalCount: number;
+} {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    const lines = content.trim().split("\n").filter(Boolean);
+    const allActivities: ActivityEntry[] = [];
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === "assistant" && entry.message?.content) {
+          const messageContent = entry.message.content;
+          if (Array.isArray(messageContent)) {
+            for (const block of messageContent) {
+              if (block.type === "tool_use" && block.name) {
+                const toolName = block.name;
+                // Skip TodoWrite in subagent too
+                if (toolName === "TodoWrite") continue;
+
+                const icon =
+                  (ICONS as Record<string, string>)[toolName] || ICONS.Default;
+                const detail = getToolDetail(toolName, block.input);
+                const timestamp = entry.timestamp
+                  ? new Date(entry.timestamp)
+                  : new Date();
+
+                allActivities.push({
+                  timestamp,
+                  type: "tool",
+                  icon,
+                  label: toolName,
+                  detail,
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // Skip invalid JSON lines
+      }
+    }
+
+    // Sort by timestamp descending (most recent first)
+    allActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    return {
+      activities: allActivities.slice(0, MAX_SUB_ACTIVITIES),
+      totalCount: allActivities.length,
+    };
+  } catch {
+    return { activities: [], totalCount: 0 };
+  }
+}
+
 /**
  * Parse session state from a JSONL session file
  */
@@ -298,13 +394,15 @@ export function parseSessionState(
                 lastActivity.count = (lastActivity.count || 1) + 1;
                 lastActivity.timestamp = lastTimestamp || new Date();
               } else {
-                activities.push({
+                const activity: ActivityEntry = {
                   timestamp: lastTimestamp || new Date(),
                   type: "tool",
                   icon,
                   label: toolName,
                   detail,
-                });
+                };
+
+                activities.push(activity);
               }
               lastType = "tool";
             } else if (block.type === "text" && block.text) {
@@ -400,10 +498,27 @@ export function parseSessionState(
     }
   }
 
-  // Return activities in reverse order (most recent first), limited to maxActivities
+  // Get the final activities (most recent first)
+  const finalActivities = activities.slice(-maxActivities).reverse();
+
+  // Post-process: Add subagent activities to Task entries
+  // Each Task gets its corresponding subagent file (matched by recency order)
+  const subagentFiles = getSubagentFiles(sessionFile);
+  let taskIndex = 0;
+  for (const activity of finalActivities) {
+    if (activity.label === "Task" && taskIndex < subagentFiles.length) {
+      const subagentData = parseSubagentFile(subagentFiles[taskIndex].filePath);
+      if (subagentData.totalCount > 0) {
+        activity.subActivities = subagentData.activities;
+        activity.subActivityCount = subagentData.totalCount;
+      }
+      taskIndex++;
+    }
+  }
+
   return {
     status,
-    activities: activities.slice(-maxActivities).reverse(),
+    activities: finalActivities,
     tokenCount,
     sessionStartTime,
     todos,

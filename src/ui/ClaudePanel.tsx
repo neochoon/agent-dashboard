@@ -389,8 +389,25 @@ export function ClaudePanel({
 
   for (let i = 0; i < state.activities.length; i++) {
     const activity = state.activities[i];
+
+    // For Task with subActivities, append count to label
+    let modifiedActivity = activity;
+    if (
+      activity.label === "Task" &&
+      activity.subActivityCount &&
+      activity.subActivityCount > 0
+    ) {
+      // Create a copy with modified detail to include count
+      modifiedActivity = {
+        ...activity,
+        detail: activity.detail
+          ? `${activity.detail} (${activity.subActivityCount})`
+          : `(${activity.subActivityCount})`,
+      };
+    }
+
     const { timestamp, icon, labelContent, displayWidth } = formatActivityParts(
-      activity,
+      modifiedActivity,
       contentWidth,
     );
     const padding = Math.max(0, contentWidth - displayWidth);
@@ -411,6 +428,74 @@ export function ClaudePanel({
         {clearEOL}
       </Text>,
     );
+
+    // Render subActivities for Task entries
+    if (activity.subActivities && activity.subActivities.length > 0) {
+      const subPrefix = "          └ "; // Align with activity content (10 spaces, after space from │)
+      const subPrefixWidth = getDisplayWidth(subPrefix);
+
+      for (let j = 0; j < activity.subActivities.length; j++) {
+        const sub = activity.subActivities[j];
+        const subStyle = getActivityStyle(sub);
+
+        // Format sub-activity: "└ Icon Label: detail"
+        const subIcon = sub.icon;
+        const subIconWidth = getDisplayWidth(subIcon);
+        const subLabel = sub.label;
+        const subDetail = sub.detail;
+
+        // Calculate available width for sub-activity content
+        const subContentPrefixWidth = subPrefixWidth + subIconWidth + 1; // prefix + icon + space
+        const availableWidth = contentWidth - subContentPrefixWidth;
+
+        let subLabelContent: string;
+        let subDisplayWidth: number;
+
+        if (subDetail) {
+          const labelPart = `${subLabel}: `;
+          const detailAvailable = availableWidth - labelPart.length;
+          let truncatedDetail = subDetail;
+
+          if (getDisplayWidth(subDetail) > detailAvailable) {
+            truncatedDetail = "";
+            let currentWidth = 0;
+            for (const char of subDetail) {
+              const charWidth = getDisplayWidth(char);
+              if (currentWidth + charWidth > detailAvailable - 3) {
+                truncatedDetail += "...";
+                currentWidth += 3;
+                break;
+              }
+              truncatedDetail += char;
+              currentWidth += charWidth;
+            }
+          }
+          subLabelContent = labelPart + truncatedDetail;
+          subDisplayWidth =
+            subContentPrefixWidth +
+            labelPart.length +
+            getDisplayWidth(truncatedDetail);
+        } else {
+          subLabelContent = subLabel;
+          subDisplayWidth = subContentPrefixWidth + subLabel.length;
+        }
+
+        const subPadding = Math.max(0, contentWidth - subDisplayWidth);
+
+        lines.push(
+          <Text key={`activity-${i}-sub-${j}`}>
+            {BOX.v} <Text dimColor>{subPrefix}</Text>
+            <Text color="cyan">{subIcon}</Text>{" "}
+            <Text color={subStyle.color} dimColor={subStyle.dimColor}>
+              {subLabelContent}
+            </Text>
+            {" ".repeat(subPadding)}
+            {BOX.v}
+            {clearEOL}
+          </Text>,
+        );
+      }
+    }
   }
 
   // Check if todos exist and determine display mode
