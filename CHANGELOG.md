@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.6.5] - 2025-01-16
+
+### New
+- **Subagent Activities** - Task entries now show their subagent's recent activities nested below with `└` prefix
+- Each Task displays up to 3 most recent tool calls from its subagent
+- Total activity count shown in parentheses (e.g., `Task: Explore codebase (15)`)
+
 ## [0.6.4] - 2025-01-16
 
 ### New
