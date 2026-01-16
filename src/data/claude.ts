@@ -161,12 +161,13 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     return defaultState;
   }
 
-  // Extract session start time from first few lines
+  // Extract session start time from first entry with a valid timestamp
+  // Skip summary/file-history-snapshot entries at the beginning
   let sessionStartTime: Date | null = null;
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  for (let i = 0; i < Math.min(50, lines.length); i++) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (entry.timestamp) {
+      if (entry.timestamp && typeof entry.timestamp === "string") {
         sessionStartTime = new Date(entry.timestamp);
         break;
       }

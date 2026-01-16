@@ -59,24 +59,34 @@ function formatCountdown(seconds: number | null | undefined): string {
 function formatTokenCount(tokens: number): string {
   if (tokens <= 0) return "";
   if (tokens < 1000) return `${tokens} tokens`;
-  const k = Math.round(tokens / 1000);
-  return `${k}K tokens`;
+  if (tokens < 1000000) return `${Math.round(tokens / 1000)}K tokens`;
+  return `${(tokens / 1000000).toFixed(1)}M tokens`;
 }
 
-function formatElapsedTime(startTime: Date | null): string {
+function formatSessionTime(startTime: Date | null): string {
   if (!startTime) return "";
-  const elapsed = Date.now() - startTime.getTime();
-  const minutes = Math.floor(elapsed / 60000);
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
 
+  // Start time (HH:MM)
+  const startHours = String(startTime.getHours()).padStart(2, "0");
+  const startMinutes = String(startTime.getMinutes()).padStart(2, "0");
+  const startStr = `${startHours}:${startMinutes}`;
+
+  // Elapsed time
+  const elapsed = Date.now() - startTime.getTime();
+  const elapsedMinutes = Math.floor(elapsed / 60000);
+  const hours = Math.floor(elapsedMinutes / 60);
+  const remainingMinutes = elapsedMinutes % 60;
+
+  let elapsedStr: string;
   if (hours > 0) {
-    return `${hours}h ${remainingMinutes}m`;
+    elapsedStr = `${hours}h ${remainingMinutes}m`;
+  } else if (elapsedMinutes > 0) {
+    elapsedStr = `${elapsedMinutes}m`;
+  } else {
+    elapsedStr = "<1m";
   }
-  if (minutes > 0) {
-    return `${minutes}m`;
-  }
-  return "<1m";
+
+  return `⏱ ${startStr} (${elapsedStr})`;
 }
 
 function getStatusIcon(status: ClaudeSessionStatus): string {
@@ -295,14 +305,14 @@ export function ClaudePanel({
 
   const { state } = data;
   const statusIcon = getStatusIcon(state.status);
-  const elapsedTime = formatElapsedTime(state.sessionStartTime);
+  const sessionTime = formatSessionTime(state.sessionStartTime);
   const tokenDisplay = formatTokenCount(state.tokenCount);
 
   // Build title suffix with tokens, elapsed time, and countdown
   // Order: 50K tokens · 30m · ↻ 10s
   const titleParts: string[] = [];
   if (tokenDisplay) titleParts.push(tokenDisplay);
-  if (elapsedTime) titleParts.push(elapsedTime);
+  if (sessionTime) titleParts.push(sessionTime);
   if (countdownSuffix) titleParts.push(countdownSuffix);
   const titleSuffix = titleParts.join(" · ");
 

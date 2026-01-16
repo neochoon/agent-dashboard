@@ -268,10 +268,62 @@ describe("ClaudePanel", () => {
       const { lastFrame: frame2 } = render(<ClaudePanel data={data2} />);
       expect(frame2()?.split("\n")[0]).toContain("1K tokens");
     });
+
+    it("shows token count with M format for >= 1 million", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 24774000,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const titleLine = lastFrame()?.split("\n")[0] || "";
+      expect(titleLine).toContain("24.8M tokens");
+    });
+
+    it("shows 1.5M for 1500000 tokens", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 1500000,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const titleLine = lastFrame()?.split("\n")[0] || "";
+      expect(titleLine).toContain("1.5M tokens");
+    });
   });
 
-  describe("elapsed time", () => {
-    it("shows elapsed time in hours and minutes in title", () => {
+  describe("session time", () => {
+    it("shows session start time and elapsed time with ⏱ icon", () => {
+      const sessionStart = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+      const startHours = String(sessionStart.getHours()).padStart(2, "0");
+      const startMinutes = String(sessionStart.getMinutes()).padStart(2, "0");
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain(`⏱ ${startHours}:${startMinutes}`);
+      expect(lastFrame()).toContain("(30m)");
+    });
+
+    it("shows elapsed time in hours and minutes format", () => {
       // 2 hours 30 minutes ago
       const sessionStart = new Date(Date.now() - 2 * 60 * 60 * 1000 - 30 * 60 * 1000);
       const data = createMockData({
@@ -285,7 +337,7 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("2h 30m");
+      expect(lastFrame()).toContain("(2h 30m)");
     });
 
     it("shows elapsed time in minutes only when less than 1 hour", () => {
@@ -302,8 +354,7 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("45m");
-      expect(lastFrame()).not.toContain("h ");
+      expect(lastFrame()).toContain("(45m)");
     });
 
     it("shows '<1m' when less than 1 minute", () => {
@@ -320,10 +371,10 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("<1m");
+      expect(lastFrame()).toContain("(<1m)");
     });
 
-    it("shows elapsed time with countdown separated by dot", () => {
+    it("shows session time with countdown separated by dot", () => {
       // 10 minutes ago
       const sessionStart = new Date(Date.now() - 10 * 60 * 1000);
       const data = createMockData({
@@ -337,8 +388,8 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} countdown={15} />);
 
-      // Should show both elapsed time and countdown with separator
-      expect(lastFrame()).toContain("10m");
+      // Should show session time and countdown with separator
+      expect(lastFrame()).toContain("(10m)");
       expect(lastFrame()).toContain("·");
       expect(lastFrame()).toContain("15s");
     });
@@ -360,7 +411,7 @@ describe("ClaudePanel", () => {
       expect(lastFrame()).not.toContain("·");
     });
 
-    it("shows elapsed time even when no active session", () => {
+    it("shows session time even when no active session", () => {
       // 1 hour ago
       const sessionStart = new Date(Date.now() - 60 * 60 * 1000);
       const data = createMockData({
@@ -376,7 +427,7 @@ describe("ClaudePanel", () => {
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
       expect(lastFrame()).toContain("No active session");
-      expect(lastFrame()).toContain("1h 0m");
+      expect(lastFrame()).toContain("(1h 0m)");
     });
   });
 
