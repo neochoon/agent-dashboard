@@ -87,7 +87,7 @@ export const ICONS = {
   Grep: "*",
   WebFetch: "@",
   WebSearch: "@",
-  Task: "▶",
+  Task: "»",
   TodoWrite: "~",
   AskUserQuestion: "?",
   // Fallback
