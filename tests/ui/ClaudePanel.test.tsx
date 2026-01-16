@@ -303,7 +303,7 @@ describe("ClaudePanel", () => {
   });
 
   describe("session time", () => {
-    it("shows session start time and elapsed time with ⏱ icon", () => {
+    it("shows session start time and elapsed time with icon", () => {
       const sessionStart = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
       const startHours = String(sessionStart.getHours()).padStart(2, "0");
       const startMinutes = String(sessionStart.getMinutes()).padStart(2, "0");
@@ -319,7 +319,7 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain(`⏱ ${startHours}:${startMinutes}`);
+      expect(lastFrame()).toContain(`${startHours}:${startMinutes}`);
       expect(lastFrame()).toContain("(30m)");
     });
 

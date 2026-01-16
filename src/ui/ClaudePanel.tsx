@@ -78,7 +78,9 @@ function formatSessionTime(startTime: Date | null): string {
   const remainingMinutes = elapsedMinutes % 60;
 
   let elapsedStr: string;
-  if (hours > 0) {
+  if (hours >= 10) {
+    elapsedStr = `${hours}h`;
+  } else if (hours > 0) {
     elapsedStr = `${hours}h ${remainingMinutes}m`;
   } else if (elapsedMinutes > 0) {
     elapsedStr = `${elapsedMinutes}m`;
@@ -86,7 +88,7 @@ function formatSessionTime(startTime: Date | null): string {
     elapsedStr = "<1m";
   }
 
-  return `⏱ ${startStr} (${elapsedStr})`;
+  return `${startStr} (${elapsedStr})`;
 }
 
 function getStatusIcon(status: ClaudeSessionStatus): string {

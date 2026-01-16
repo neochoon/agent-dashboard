@@ -55,9 +55,9 @@ export const BOX = {
 export function createTitleLine(label: string, suffix: string = "", panelWidth: number = DEFAULT_PANEL_WIDTH): string {
   const leftPart = BOX.h + " " + label + " ";
   const rightPart = suffix ? " " + suffix + " " + BOX.h : "";
-  // Use display width for suffix since it may contain emojis
-  const leftWidth = leftPart.length;
-  const rightWidth = suffix ? 1 + getDisplayWidth(suffix) + 1 + 1 : 0; // space + suffix + space + dash
+  // Use display width for both parts to handle special characters correctly
+  const leftWidth = getDisplayWidth(leftPart);
+  const rightWidth = suffix ? getDisplayWidth(rightPart) : 0;
   const dashCount = panelWidth - 1 - leftWidth - rightWidth - 1;
   const dashes = BOX.h.repeat(Math.max(0, dashCount));
   return BOX.tl + leftPart + dashes + rightPart + BOX.tr;
