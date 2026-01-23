@@ -407,14 +407,15 @@ export function ClaudePanel({
   // Active session - build activity log lines
   const lines: React.ReactElement[] = [];
 
-  // Slice activities if maxActivities is specified
-  const displayActivities =
-    maxActivities !== undefined
-      ? state.activities.slice(0, maxActivities)
-      : state.activities;
+  // Track total lines rendered (including subactivities) to respect maxActivities
+  let totalLinesRendered = 0;
+  const effectiveMaxLines = maxActivities ?? state.activities.length * 4; // fallback to generous limit
 
-  for (let i = 0; i < displayActivities.length; i++) {
-    const activity = displayActivities[i];
+  for (let i = 0; i < state.activities.length; i++) {
+    // Stop if we've reached the max lines
+    if (totalLinesRendered >= effectiveMaxLines) break;
+
+    const activity = state.activities[i];
 
     // For Task with subActivities, append count to label
     let modifiedActivity = activity;
@@ -450,13 +451,21 @@ export function ClaudePanel({
         {BOX.v}
       </Text>,
     );
+    totalLinesRendered++;
 
-    // Render subActivities for Task entries
-    if (activity.subActivities && activity.subActivities.length > 0) {
+    // Render subActivities for Task entries (if we still have room)
+    if (
+      activity.subActivities &&
+      activity.subActivities.length > 0 &&
+      totalLinesRendered < effectiveMaxLines
+    ) {
       const subPrefix = "          └ "; // Align with activity content (10 spaces, after space from │)
       const subPrefixWidth = getDisplayWidth(subPrefix);
 
       for (let j = 0; j < activity.subActivities.length; j++) {
+        // Stop if we've reached the max lines
+        if (totalLinesRendered >= effectiveMaxLines) break;
+
         const sub = activity.subActivities[j];
         const subStyle = getActivityStyle(sub);
 
@@ -515,6 +524,7 @@ export function ClaudePanel({
             {BOX.v}
           </Text>,
         );
+        totalLinesRendered++;
       }
     }
   }
