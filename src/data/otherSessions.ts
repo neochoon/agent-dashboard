@@ -36,12 +36,37 @@ function getProjectsDir(): string {
 }
 
 function decodeProjectPath(encoded: string): string {
-  // Claude Code encodes paths by replacing "/" (or "\" on Windows) with "-"
-  // e.g., "/Users/test/pain-radar" -> "-Users-test-pain-radar"
-  // e.g., "C:\Users\test\project" -> "-C--Users-test-project" (Windows)
+  // Claude Code encodes paths by replacing "/", "\", and ":" with "-"
+  // e.g., "/Users/test/project" -> "-Users-test-project"
+  // e.g., "C:\Users\test\project" -> "C--Users-test-project" (Windows)
+  //       Note: C: becomes C- then \ becomes -, so C:\ becomes C--
+  //
   // Problem: we can't distinguish "-" that was a separator from original "-"
   //
-  // Strategy: Check if naive decode exists, if not try smart decode
+  // Strategy: Detect Windows drive letter pattern, then smart decode
+
+  // Check for Windows drive letter pattern: single letter followed by --
+  // e.g., "C--Users-..." means C:\Users\...
+  const windowsDriveMatch = encoded.match(/^([A-Za-z])--(.*)$/);
+  if (windowsDriveMatch) {
+    const driveLetter = windowsDriveMatch[1];
+    const rest = windowsDriveMatch[2];
+    // Reconstruct Windows path: C: + \ + decoded rest
+    const decodedRest = rest.replace(/-/g, sep);
+    const windowsPath = `${driveLetter}:${sep}${decodedRest}`;
+    if (existsSync(windowsPath)) {
+      return windowsPath;
+    }
+    // Try smart decode for the rest (handles paths with dashes in names)
+    const smartDecodedRest = smartDecodePath(rest);
+    const smartWindowsPath = `${driveLetter}:${sep}${smartDecodedRest}`;
+    if (existsSync(smartWindowsPath)) {
+      return smartWindowsPath;
+    }
+    return windowsPath; // Return best guess even if doesn't exist
+  }
+
+  // Unix path: starts with - (representing /)
   const naiveDecoded = encoded.replace(/-/g, sep);
 
   // If naive decode exists, use it (handles simple cases)
@@ -49,10 +74,17 @@ function decodeProjectPath(encoded: string): string {
     return naiveDecoded;
   }
 
-  // Smart decode: try to find actual path by checking filesystem
+  // Smart decode for Unix paths
+  return smartDecodePath(encoded) || naiveDecoded;
+}
+
+/**
+ * Smart decode path segments by checking filesystem for directories with dashes
+ */
+function smartDecodePath(encoded: string): string {
   const segments = encoded.split("-").filter(Boolean);
   if (segments.length === 0) {
-    return naiveDecoded;
+    return "";
   }
 
   let currentPath = "";
@@ -91,7 +123,7 @@ function decodeProjectPath(encoded: string): string {
     }
   }
 
-  return currentPath || naiveDecoded;
+  return currentPath;
 }
 
 export function getAllProjects(): ProjectInfo[] {

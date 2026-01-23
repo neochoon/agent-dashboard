@@ -1705,9 +1705,10 @@ describe("claude data module", () => {
       mockStatSync.mockReturnValue({
         mtimeMs: Date.now() - 61 * 60 * 1000,
         size: 1000,
-      } as any); // 61 minutes ago (beyond default 60 min timeout)
+      } as any); // 61 minutes ago
 
-      const result = getClaudeData("/Users/test/project");
+      // Pass explicit 60-minute timeout (file is beyond this timeout)
+      const result = getClaudeData("/Users/test/project", undefined, 60 * 60 * 1000);
 
       expect(result.state.status).toBe("none");
       expect(result.hasSession).toBe(true);

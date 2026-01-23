@@ -431,7 +431,8 @@ describe("git data module", () => {
         command: {
           branch: "echo main",
           commits: "echo ''",
-          stats: 'printf "15\\t3\\tsrc/file.ts"',
+          // Use node -e for cross-platform tab output (works on Windows and Unix)
+          stats: 'node -e "console.log(\'15\\t3\\tsrc/file.ts\')"',
         },
       };
 
@@ -451,7 +452,8 @@ describe("git data module", () => {
         command: {
           branch: "echo main",
           commits: "echo ''",
-          stats: 'printf "10\\t5\\tcode.ts\\n-\\t-\\timage.png"',
+          // Use node -e for cross-platform output (works on Windows and Unix)
+          stats: 'node -e "console.log(\'10\\t5\\tcode.ts\\n-\\t-\\timage.png\')"',
         },
       };
 

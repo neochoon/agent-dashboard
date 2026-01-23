@@ -30,7 +30,7 @@ export interface ProjectPanelConfig extends PanelConfig {
 
 export interface ClaudePanelConfig extends PanelConfig {
   maxActivities?: number;
-  sessionTimeout?: number; // in milliseconds, default 60 minutes
+  sessionTimeout?: number; // in milliseconds, default: since midnight (today's sessions only)
 }
 
 export interface OtherSessionsPanelConfig extends PanelConfig {
@@ -112,7 +112,7 @@ export function getDefaultConfig(): Config {
       claude: {
         enabled: true,
         interval: 10000, // 10 seconds default
-        sessionTimeout: 60 * 60 * 1000, // 60 minutes default
+        // sessionTimeout defaults to undefined = since midnight (today's sessions)
       },
       other_sessions: {
         enabled: true,

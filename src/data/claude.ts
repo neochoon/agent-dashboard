@@ -585,7 +585,15 @@ export function parseSessionState(
   };
 }
 
-const DEFAULT_SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes
+/**
+ * Calculate milliseconds since midnight (start of today)
+ * This is used as the default session timeout - only show today's sessions
+ */
+function getTimeSinceMidnight(): number {
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return now.getTime() - midnight.getTime();
+}
 
 /**
  * Get Claude session data for a project
@@ -593,8 +601,10 @@ const DEFAULT_SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes
 export function getClaudeData(
   projectPath: string,
   maxActivities?: number,
-  sessionTimeout: number = DEFAULT_SESSION_TIMEOUT,
+  sessionTimeout?: number,
 ): ClaudeData {
+  // Default to "since midnight" - only show today's sessions
+  const effectiveTimeout = sessionTimeout ?? getTimeSinceMidnight();
   const defaultState: ClaudeSessionState = {
     status: "none",
     activities: [],
@@ -608,7 +618,7 @@ export function getClaudeData(
   try {
     const sessionDir = getClaudeSessionPath(projectPath);
     const hasSession = existsSync(sessionDir);
-    const sessionFile = findActiveSession(sessionDir, sessionTimeout);
+    const sessionFile = findActiveSession(sessionDir, effectiveTimeout);
 
     if (!sessionFile) {
       return {
